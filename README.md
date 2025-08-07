@@ -1,5 +1,5 @@
 ---
-title: 'EquilibraTor Streamlines Molecular Dynamics and Equilibration Simulations in a Single Execution'
+title: 'BacterialPloidyPredictor: the bacterial polyploidy predictor based on complete genomic assemblies'
 tags:
   - Python
   - Bacterial genomics
