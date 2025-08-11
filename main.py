@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
+import matplotlib.pyplot as plt
 
 # ---------- Core utilities ----------
 
@@ -180,6 +181,89 @@ def run_folder(
         df = add_interactions(df)
     return df
 
+# ---------- Batch runner ----------
+def compute_window_skews(seq: str, num_windows: int = 4096):
+    """Return (gc_skew, at_skew, cum_gc, cum_at) as NumPy arrays of length num_windows."""
+    s_bytes = seq.upper().encode("ascii", errors="ignore")
+    n = len(s_bytes)
+    if num_windows <= 0:
+        raise ValueError("num_windows must be positive")
+    if n == 0:
+        z = np.zeros(num_windows, dtype=float)
+        return z, z, z, z
+
+    win = n // num_windows
+    starts = win * np.arange(num_windows, dtype=np.int64)
+    ends = np.minimum(starts + win, n)
+    ends[-1] = n
+
+    arr = np.frombuffer(s_bytes, dtype="S1")
+    is_a, is_t, is_g, is_c = (arr == b"A"), (arr == b"T"), (arr == b"G"), (arr == b"C")
+
+    def rngsum(mask):
+        cum = np.concatenate(([0], np.cumsum(mask, dtype=np.int64)))
+        return cum[ends] - cum[starts]
+
+    a, t, g, c = rngsum(is_a), rngsum(is_t), rngsum(is_g), rngsum(is_c)
+    at_den = a + t
+    gc_den = g + c
+
+    at_skew = np.zeros_like(at_den, dtype=float)
+    gc_skew = np.zeros_like(gc_den, dtype=float)
+    nz_at = at_den != 0
+    nz_gc = gc_den != 0
+    at_skew[nz_at] = (a[nz_at] - t[nz_at]) / at_den[nz_at]
+    gc_skew[nz_gc] = (c[nz_gc] - g[nz_gc]) / gc_den[nz_gc]
+
+    return gc_skew, at_skew, np.cumsum(gc_skew), np.cumsum(at_skew)
+
+def plot_linear_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_path: Path):
+    """Linear plot of cumulative GC and AT skew vs window index."""
+    x = np.arange(gc_skew.size)
+    plt.figure(figsize=(9, 3))
+    plt.plot(x, np.cumsum(gc_skew), label="Cumulative GC skew")
+    plt.plot(x, np.cumsum(at_skew), label="Cumulative AT skew")
+    plt.xlabel("Window index"); plt.ylabel("Cumulative skew"); plt.title(title)
+    plt.legend(loc="best"); plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
+
+def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_path: Path):
+    """Circular (polar) plot of per-window GC/AT skew as two rings."""
+    N = gc_skew.size
+    theta = np.linspace(0, 2*np.pi, N, endpoint=False)
+    def _norm(v):
+        m = np.percentile(np.abs(v), 99) or 1.0
+        return 0.4 * (v / m)
+    gc_r = 1.0 + _norm(gc_skew)  # outer ring center
+    at_r = 0.6 + _norm(at_skew)  # inner ring center
+    fig = plt.figure(figsize=(5,5)); ax = plt.subplot(111, polar=True)
+    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
+    ax.plot(theta, np.full(N, 0.6), linewidth=1, alpha=0.5)
+    ax.plot(theta, gc_r, linewidth=1, label="GC skew")
+    ax.plot(theta, at_r, linewidth=1, label="AT skew")
+    ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
+    ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.2))
+    plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
+
+def visualize_genome_skews(fasta_path: Path, out_dir: Path, num_windows: int = 4096):
+    """Create linear and circular GC/AT skew images for one genome."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    seq = read_first_fasta_sequence(fasta_path)
+    gc_skew, at_skew, _, _ = compute_window_skews(seq, num_windows=num_windows)
+    base = fasta_path.stem
+    plot_linear_skews(gc_skew, at_skew, f"{base} — cumulative GC/AT skew",
+                      out_dir / f"{base}_linear_skew.png")
+    plot_circular_skews(gc_skew, at_skew, f"{base} — circular GC/AT skew",
+                        out_dir / f"{base}_circular_skew.png")
+
+def batch_visualize(fasta_files: List[str], out_root: Path, num_windows: int = 4096):
+    """Generate images for many genomes under out_root / 'image'."""
+    img_dir = out_root / "image"; img_dir.mkdir(parents=True, exist_ok=True)
+    for f in fasta_files:
+        fp = Path(f)
+        if fp.exists():
+            visualize_genome_skews(fp, img_dir, num_windows=num_windows)
+    return img_dir
+
 # ---------- Optional CLI ----------
 
 if __name__ == "__main__":
@@ -195,6 +279,8 @@ if __name__ == "__main__":
     p.add_argument("--no-interactions", action="store_true",
                    help="Do not add interaction terms")
     p.add_argument("--out", type=str, default="gcsi_features.csv", help="Output CSV path")
+    p.add_argument("--images", action="store_true",
+               help="Generate GC/AT skew images into ./image")
 
     args = p.parse_args()
     df = run_folder(
@@ -205,5 +291,10 @@ if __name__ == "__main__":
         alpha=args.alpha,
         add_interaction_terms=not args.no_interactions,
     )
+    if args.images:
+    img_dir = batch_visualize([str(p) for p in (Path(args.folder).glob('*.fa*'))],
+                              out_root=Path(args.folder),
+                              num_windows=args.num_windows)
+    print(f"Saved images to {img_dir}")
     df.to_csv(args.out, index=False)
     print(f"Wrote {args.out} with {len(df)} rows")
