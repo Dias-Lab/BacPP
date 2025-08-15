@@ -38,7 +38,7 @@ Since bactetial polyploidy is a less investigated from a eco-evolutionary perspe
 - **Illustration extracted features**:
   Extracted features including GC skew, AT skew, and mutual information between predictors will be provided. 
 - **Estimation of prediction confidence**:
-  If using kNN, the Euclidean distance between samples and their closest reference points will be calculated and placed in the distribution of pairwise Euclidean distance among reference data. A metric will be provided to quantify the relative confidence of the prediction. 
+  If using kNN, the Euclidean distance between samples and their closest reference points will be calculated and placed in the distribution of pairwise Euclidean distance among reference data. A metric will be provided to quantify the relative confidence of the prediction. 3-dimentional PCA space will be visualized as well with sampling data and reference data.
 
 # Outputs
 
