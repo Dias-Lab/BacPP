@@ -34,10 +34,11 @@ Since bactetial polyploidy is a less investigated from a eco-evolutionary perspe
 - **Automation of pre-processing and feature extraction**
   BacterialPloidyPredictor treats *.fasta/*.fna/*.fa files containing complete genome assemblies as input, and gives them an optional genome completeness inspection using CheckM2. Extracted features including GC skew, AT skew, relative distances between replication origin and replication terminus and their interaction terms are used for downstream prediction.
 - **Prediction of monoploidy/polyploidy based on extracted features**
-  Using either pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy.
+  Use either pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy.
 - **Illustration extracted features**
-  Extracted features including GC skew, AT skew, 
+  Extracted features including GC skew, AT skew, and mutual information between predictors will be provided. 
 - **Estimation of prediction confidence**
+  If using kNN, the Euclidean distance between samples and their closest reference points will be calculated and placed in the distribution of pairwise Euclidean distance among reference data. A metric will be provided to quantify the relative confidence of the prediction. 
 
 # Outputs
 
