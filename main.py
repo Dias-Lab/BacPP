@@ -173,11 +173,11 @@ def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
     """
     gc_sr = df["gc_sr"].to_numpy(float)
     gc_sa = df["gc_sa"].to_numpy(float)
-    pc_pk = df["gc_peak.dist"].to_numpy(float)
+    gc_pk = df["gc_peak.dist"].to_numpy(float)
     gc_idx = df["gc_index.dist"].to_numpy(float)
     at_sr = df["at_sr"].to_numpy(float)
     at_sa = df["at_sa"].to_numpy(float)
-    pc_pk = df["at_peak.dist"].to_numpy(float)
+    at_pk = df["at_peak.dist"].to_numpy(float)
     at_idx = df["at_index.dist"].to_numpy(float)
 
     # Multiplications
@@ -279,9 +279,13 @@ def run_folder(
     df = pd.DataFrame(rows)
     if add_interaction_terms and not df.empty:
         df = add_interactions(df)
-        new_column_order = [0, 1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 5, 6, 7, 8, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
-        reordered_df = df[:, new_column_order]
-    return reordered_df
+        # If you want a specific order, use iloc with indices
+        new_column_order = [
+            0, 1, 2, 3, 4, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,
+            5, 6, 7, 8, 27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44
+        ]
+        df = df.iloc[:, new_column_order]
+    return df
 
 # ---------- Batch runner ----------
 def compute_window_skews(seq: str, num_windows: int = 4096):
@@ -394,9 +398,9 @@ if __name__ == "__main__":
         add_interaction_terms=not args.no_interactions,
     )
     if args.images:
-    img_dir = batch_visualize([str(p) for p in (Path(args.folder).glob('*.fa*'))],
+        img_dir = batch_visualize([str(p) for p in (Path(args.folder).glob('*.fa*'))],
                               out_root=Path(args.folder),
                               num_windows=args.num_windows)
-    print(f"Saved images to {img_dir}")
+        print(f"Saved images to {img_dir}")
     df.to_csv(args.out, index=False)
     print(f"Wrote {args.out} with {len(df)} rows")
