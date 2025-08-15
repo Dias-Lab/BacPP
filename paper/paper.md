@@ -29,7 +29,8 @@ Recent predictions challenges the previous consensus that most bacteria are mono
 
 # Implementation
 BacterialPloidyPredictor samples complete genome assemblies in batch to extract the features associated with global genomic architecture, including GC skew, AT skew, and a series of other genomic features derived from the characterization of nucleotide bias. These features are then used as input for three pre-trained different machine learning models based on logistic regression, XGBoost, and k-nearest neighbors (kNN). Although optimized during the development, parameters can be fine-tuned according to researcher's need. However, the use defalut parameters gives users a straightforward prediction, allowing them focus on the biological interpretation of this phenotype with minimal inteference with parameters. Besides, a series of plots visualize the confidence of prediction and the relationships with lebeled trainng data. (\autoref{fig:workflow})
-\label{fig:workflow}](figures/BacterialPloidyPredictor-flowchart.png)
+![BacterialPloidyPredictor.\label{fig:workflow}](figures/BacterialPloidyPredictor-flowchart.png)
+
 
 # Outputs
 
