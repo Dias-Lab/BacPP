@@ -3,6 +3,8 @@ title: 'BacterialPloidyPredictor: the bacterial polyploidy predictor based on co
 tags:
   - Python
   - Bacterial genomics
+  - Microbial ecology
+  - Microbiome
 authors:
   - name: Zhenxiong Jiang
     orcid: 0000-0002-7912-1934
