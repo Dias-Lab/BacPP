@@ -334,12 +334,12 @@ def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, ou
     theta = np.linspace(0, 2*np.pi, N, endpoint=False)
     def _norm(v):
         m = np.percentile(np.abs(v), 99) or 1.0
-        return 0.4 * (v / m)
-    gc_r = 1.0 + _norm(gc_skew)  # outer ring center
-    at_r = 0.6 + _norm(at_skew)  # inner ring center
+        return 0.05 * (v / m)
+    gc_r = 2.0 + _norm(gc_skew)  # outer ring center
+    at_r = 2.0 + _norm(at_skew)  # inner ring center
     fig = plt.figure(figsize=(5,5)); ax = plt.subplot(111, polar=True)
     ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
-    ax.plot(theta, np.full(N, 0.6), linewidth=1, alpha=0.5)
+    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
     ax.plot(theta, gc_r, linewidth=1, label="GC skew")
     ax.plot(theta, at_r, linewidth=1, label="AT skew")
     ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
@@ -371,7 +371,7 @@ def batch_visualize(fasta_files: List[str], out_root: Path, num_windows: int = 4
 if __name__ == "__main__":
     import argparse
 
-    p = argparse.ArgumentParser(description="Compute GC-skew FFT features for FASTA files.")
+    p = argparse.ArgumentParser(description="Compute GC-skew and AT-skew FFT features for FASTA files.")
     p.add_argument("folder", type=str, help="Folder containing FASTA/FA/FNA files")
     p.add_argument("--num-windows", type=int, default=4096,
                    help="Number of windows (default: 4096)")
@@ -380,7 +380,7 @@ if __name__ == "__main__":
     p.add_argument("--alpha", type=float, default=0.4)
     p.add_argument("--no-interactions", action="store_true",
                    help="Do not add interaction terms")
-    p.add_argument("--out", type=str, default="gcsi_features.csv", help="Output CSV path")
+    p.add_argument("--out", type=str, default="extracted_features.csv", help="Output CSV path")
     p.add_argument("--images", action="store_true",
                help="Generate GC/AT skew images into ./image")
 
