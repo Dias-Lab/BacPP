@@ -6,7 +6,7 @@ tags:
 authors:
   - name: Zhenxiong Jiang
     orcid: 0000-0002-7912-1934
-    equal-contrib: true
+    equal-contrib: false
     affiliation: "1"
   - name: Raquel Dias
     orcid: 0000-0002-8387-1324
