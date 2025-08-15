@@ -60,6 +60,41 @@ def gc_skew_vectorized(seq: str, num_windows: int = 4096) -> np.ndarray:
     skews[nz] = (c_counts[nz] - g_counts[nz]) / denom[nz]
     return skews
 
+def at_skew_vectorized(seq: str, num_windows: int = 4096) -> np.ndarray:
+    """
+    Fully vectorized AT skew over num_windows:
+      window_size = floor(len(seq)/num_windows), last window takes remainder.
+      skew = (A - T) / (A + T), 0 if denom==0.
+    """
+    if num_windows <= 0:
+        raise ValueError("num_windows must be positive")
+
+    s_bytes = seq.upper().encode("ascii", errors="ignore")
+    n = len(s_bytes)
+    if n == 0:
+        return np.zeros(num_windows, dtype=float)
+
+    win = n // num_windows
+    starts = win * np.arange(num_windows, dtype=np.int64)
+    ends = np.minimum(starts + win, n)
+    ends[-1] = n
+
+    arr = np.frombuffer(s_bytes, dtype="S1")
+    is_a = (arr == b"A")
+    is_t = (arr == b"T")
+
+    a_cum = np.concatenate(([0], np.cumsum(is_a, dtype=np.int64)))
+    t_cum = np.concatenate(([0], np.cumsum(is_t, dtype=np.int64)))
+
+    a_counts = a_cum[ends] - a_cum[starts]
+    t_counts = t_cum[ends] - t_cum[starts]
+    denom = a_counts + t_counts
+
+    skews = np.zeros(num_windows, dtype=float)
+    nz = denom != 0
+    skews[nz] = (a_counts[nz] - t_counts[nz]) / denom[nz]
+    return skews
+
 def gcsi_features_from_gcskew(
     gc_skew: np.ndarray,
     k3: float = 600.0,
@@ -80,19 +115,47 @@ def gcsi_features_from_gcskew(
     power_at_1Hz = float(ps[1]) if N > 1 else 0.0
     avg_other = float(ps[2:N].mean()) if N > 2 else 0.0
 
-    sr = (power_at_1Hz / avg_other) if avg_other > 0 else 0.0
-    sa = k4 * (k3 * power_at_1Hz) ** alpha
+    gc_sr = (power_at_1Hz / avg_other) if avg_other > 0 else 0.0
+    gc_sa = k4 * (k3 * power_at_1Hz) ** alpha
 
     cum = np.cumsum(x)
-    peak_dist = float(cum.max() - cum.min())
+    gc_peak_dist = float(cum.max() - cum.min())
 
     argmax = int(np.argmax(cum))
     argmin = int(np.argmin(cum))
     idx_gap = abs(argmax - argmin)
     circ_gap = min(idx_gap, N - idx_gap)
-    index_dist = int(circ_gap)
+    gc_index_dist = int(circ_gap)
 
-    return sr, sa, peak_dist, index_dist
+    return gc_sr, gc_sa, gc_peak_dist, gc_index_dist
+
+def atsi_features_from_atskew(
+    at_skew: np.ndarray,
+    k3: float = 600.0,
+    k4: float = 40.0,
+    alpha: float = 0.4,
+) -> Tuple[float, float, float, int]:
+    
+    x = np.asarray(at_skew, dtype=float)
+    N = x.size
+
+    ps = np.abs(np.fft.fft(x)) ** 2
+    power_at_1Hz = float(ps[1]) if N > 1 else 0.0
+    avg_other = float(ps[2:N].mean()) if N > 2 else 0.0
+
+    at_sr = (power_at_1Hz / avg_other) if avg_other > 0 else 0.0
+    at_sa = k4 * (k3 * power_at_1Hz) ** alpha
+
+    cum = np.cumsum(x)
+    at_peak_dist = float(cum.max() - cum.min())
+
+    argmax = int(np.argmax(cum))
+    argmin = int(np.argmin(cum))
+    idx_gap = abs(argmax - argmin)
+    circ_gap = min(idx_gap, N - idx_gap)
+    at_index_dist = int(circ_gap)
+
+    return at_sr, at_sa, at_peak_dist, at_index_dist
 
 # ---------- Interaction terms ----------
 
@@ -103,40 +166,69 @@ def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return out
 
 def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
+    file = df["file"]
     """
     Add interaction terms:
       X -> multiplication, I -> division (safe; NaN if denominator == 0).
     """
-    sr = df["sr"].to_numpy(float)
-    sa = df["sa"].to_numpy(float)
-    pk = df["peak.dist"].to_numpy(float)
-    idx = df["index.dist"].to_numpy(float)
+    gc_sr = df["gc_sr"].to_numpy(float)
+    gc_sa = df["gc_sa"].to_numpy(float)
+    pc_pk = df["gc_peak.dist"].to_numpy(float)
+    gc_idx = df["gc_index.dist"].to_numpy(float)
+    at_sr = df["at_sr"].to_numpy(float)
+    at_sa = df["at_sa"].to_numpy(float)
+    pc_pk = df["at_peak.dist"].to_numpy(float)
+    at_idx = df["at_index.dist"].to_numpy(float)
 
     # Multiplications
-    df["srXsa"] = sr * sa
-    df["srXpeak.dist"] = sr * pk
-    df["srXindex.dist"] = sr * idx
-    df["saXpeak.dist"] = sa * pk
-    df["saXindex.dist"] = sa * idx
-    df["peak.distXindex.dist"] = pk * idx
+    df["gc_srXsa"] = gc_sr * gc_sa
+    df["gc_srXpeak.dist"] = gc_sr * gc_pk
+    df["gc_srXindex.dist"] = gc_sr * gc_idx
+    df["gc_saXpeak.dist"] = gc_sa * gc_pk
+    df["gc_saXindex.dist"] = gc_sa * gc_idx
+    df["gc_peak.distXindex.dist"] = gc_pk * gc_idx
 
     # Divisions (A I B == A / B)
-    df["srIsa"] = _safe_div(sr, sa)
-    df["srIpeak.dist"] = _safe_div(sr, pk)
-    df["srIindex.dist"] = _safe_div(sr, idx)
+    df["gc_srIsa"] = _safe_div(gc_sr, gc_sa)
+    df["gc_srIpeak.dist"] = _safe_div(gc_sr, gc_pk)
+    df["gc_srIindex.dist"] = _safe_div(gc_sr, gc_idx)
 
-    df["saIsr"] = _safe_div(sa, sr)
-    df["saIpeak.dist"] = _safe_div(sa, pk)
-    df["saIindex.dist"] = _safe_div(sa, idx)
+    df["gc_saIsr"] = _safe_div(gc_sa, gc_sr)
+    df["gc_saIpeak.dist"] = _safe_div(gc_sa, gc_pk)
+    df["gc_saIindex.dist"] = _safe_div(gc_sa, gc_idx)
 
-    df["peak.distIsr"] = _safe_div(pk, sr)
-    df["peak.distIsa"] = _safe_div(pk, sa)
-    df["peak.distIindex.dist"] = _safe_div(pk, idx)
+    df["gc_peak.distIsr"] = _safe_div(gc_pk, gc_sr)
+    df["gc_peak.distIsa"] = _safe_div(gc_pk, gc_sa)
+    df["gc_peak.distIindex.dist"] = _safe_div(gc_pk, gc_idx)
 
-    df["index.distIsr"] = _safe_div(idx, sr)
-    df["index.distIsa"] = _safe_div(idx, sa)
-    df["index.distIpeak.dist"] = _safe_div(idx, pk)
+    df["gc_index.distIsr"] = _safe_div(gc_idx, gc_sr)
+    df["gc_index.distIsa"] = _safe_div(gc_idx, gc_sa)
+    df["gc_index.distIpeak.dist"] = _safe_div(gc_idx, gc_pk)
 
+    # Multiplications
+    df["at_srXsa"] = at_sr * at_sa
+    df["at_srXpeak.dist"] = at_sr * at_pk
+    df["at_srXindex.dist"] = at_sr * at_idx
+    df["at_saXpeak.dist"] = at_sa * at_pk
+    df["at_saXindex.dist"] = at_sa * at_idx
+    df["at_peak.distXindex.dist"] = at_pk * at_idx
+
+    # Divisions (A I B == A / B)
+    df["at_srIsa"] = _safe_div(at_sr, at_sa)
+    df["at_srIpeak.dist"] = _safe_div(at_sr, at_pk)
+    df["at_srIindex.dist"] = _safe_div(at_sr, at_idx)
+
+    df["at_saIsr"] = _safe_div(at_sa, at_sr)
+    df["at_saIpeak.dist"] = _safe_div(at_sa, at_pk)
+    df["at_saIindex.dist"] = _safe_div(at_sa, at_idx)
+
+    df["at_peak.distIsr"] = _safe_div(at_pk, at_sr)
+    df["at_peak.distIsa"] = _safe_div(at_pk, at_sa)
+    df["at_peak.distIindex.dist"] = _safe_div(at_pk, at_idx)
+
+    df["at_index.distIsr"] = _safe_div(at_idx, at_sr)
+    df["at_index.distIsa"] = _safe_div(at_idx, at_sa)
+    df["at_index.distIpeak.dist"] = _safe_div(at_idx, at_pk)
     return df
 
 # ---------- Batch runner ----------
@@ -163,23 +255,33 @@ def run_folder(
     for fp in files:
         seq = read_first_fasta_sequence(fp)
         gc_skew = gc_skew_vectorized(seq, num_windows=num_windows)
-        sr, sa, peak_dist, index_dist = gcsi_features_from_gcskew(
+        gc_sr, gc_sa, gc_peak_dist, gc_index_dist = gcsi_features_from_gcskew(
             gc_skew, k3=k3, k4=k4, alpha=alpha
+        )
+        at_skew = at_skew_vectorized(seq, num_windows=num_windows)
+        at_sr, at_sa, at_peak_dist, at_index_dist = atsi_features_from_atskew(
+            at_skew, k3=k3, k4=k4, alpha=alpha
         )
         rows.append(
             {
                 "file": fp.name,
-                "sr": sr,
-                "sa": sa,
-                "peak.dist": peak_dist,
-                "index.dist": index_dist,
+                "gc_sr": gc_sr,
+                "gc_sa": gc_sa,
+                "gc_peak.dist": gc_peak_dist,
+                "gc_index.dist": gc_index_dist,
+                "at_sr": at_sr,
+                "at_sa": at_sa,
+                "at_peak.dist": at_peak_dist,
+                "at_index.dist": at_index_dist,
             }
         )
 
     df = pd.DataFrame(rows)
     if add_interaction_terms and not df.empty:
         df = add_interactions(df)
-    return df
+        new_column_order = [0, 1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 5, 6, 7, 8, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+        reordered_df = df[:, new_column_order]
+    return reordered_df
 
 # ---------- Batch runner ----------
 def compute_window_skews(seq: str, num_windows: int = 4096):
