@@ -31,13 +31,13 @@ Recent predictions challenges the previous consensus that most bacteria are mono
 BacterialPloidyPredictor samples complete genome assemblies in batch to extract the features associated with global genomic architecture, including GC skew, AT skew, and a series of other genomic features derived from the characterization of nucleotide bias. These features are then used as input for three pre-trained different machine learning models based on logistic regression, XGBoost, and k-nearest neighbors (kNN). Although optimized during the development, parameters can be fine-tuned according to researcher's need. However, the use defalut parameters gives users a biologically meaningful prediction, allowing them focus on the correlational or causational interpretation of this phenotype with minimal inteference with parameters. Besides, a series of plots visualize the confidence of prediction and the relationships with lebeled trainng data. (\autoref{fig:workflow})
 ![BacterialPloidyPredictor.\label{fig:workflow}](figures/BacterialPloidyPredictor-flowchart.png)
 Since bactetial polyploidy is a less investigated from a eco-evolutionary perspective, BactertialPloidyPredictor provides the following functions:
-- **Automation of pre-processing and feature extraction**
-  BacterialPloidyPredictor treats *.fasta/*.fna/*.fa files containing complete genome assemblies as input, and gives them an optional genome completeness inspection using CheckM2. Extracted features including GC skew, AT skew, relative distances between replication origin and replication terminus and their interaction terms are used for downstream prediction.
-- **Prediction of monoploidy/polyploidy based on extracted features**
+- **Automation of pre-processing and feature extraction**:
+  BacterialPloidyPredictor treats *.fasta/*.fna/*.fa files containing complete genome assemblies as input, and gives them an optional genome completeness inspection using CheckM2. Extracted features including genomic GC skew, genomic AT skew, relative distances between replication origin and replication terminus and their interaction terms are used for downstream prediction.
+- **Prediction of monoploidy/polyploidy based on extracted features**:
   Use either pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy.
-- **Illustration extracted features**
+- **Illustration extracted features**:
   Extracted features including GC skew, AT skew, and mutual information between predictors will be provided. 
-- **Estimation of prediction confidence**
+- **Estimation of prediction confidence**:
   If using kNN, the Euclidean distance between samples and their closest reference points will be calculated and placed in the distribution of pairwise Euclidean distance among reference data. A metric will be provided to quantify the relative confidence of the prediction. 
 
 # Outputs
