@@ -353,7 +353,7 @@ def plot_linear_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_
 #    plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
 
 def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title:str, out_path):
-    N = skew.size
+    N = gc_skew.size
     theta = np.linspace(0, 2*np.pi, N, endpoint=False)
     gc_mag = np.percentile(np.abs(gc_skew), 99) or 1.0
     at_mag = np.percentile(np.abs(at_skew), 99) or 1.0
