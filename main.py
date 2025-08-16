@@ -332,23 +332,52 @@ def plot_linear_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_
     plt.xlabel("Window index"); plt.ylabel("Cumulative skew"); plt.title(title)
     plt.legend(loc="best"); plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
 
-def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_path: Path):
-    """Circular (polar) plot of per-window GC/AT skew as two rings."""
-    N = gc_skew.size
+#def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_path: Path):
+#    """Circular (polar) plot of per-window GC/AT skew as two rings."""
+#    N = gc_skew.size
+#    theta = np.linspace(0, 2*np.pi, N, endpoint=False)
+#    def _norm(v):
+#        m = np.percentile(np.abs(v), 99) or 1.0
+#        return 0.05 * (v / m)
+
+#    gc_r = 2.0 + _norm(gc_skew)  # outer ring center
+#    at_r = 2.0 + _norm(at_skew)  # inner ring center
+
+#    fig = plt.figure(figsize=(5,5)); ax = plt.subplot(111, polar=True)
+#    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
+#    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
+#    ax.plot(theta, gc_r, linewidth=1, label="GC skew")
+#    ax.plot(theta, at_r, linewidth=1, label="AT skew")
+#    ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
+#    ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.2))
+#    plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
+
+def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title:str, out_path):
+    N = skew.size
     theta = np.linspace(0, 2*np.pi, N, endpoint=False)
-    def _norm(v):
-        m = np.percentile(np.abs(v), 99) or 1.0
-        return 0.05 * (v / m)
-    gc_r = 2.0 + _norm(gc_skew)  # outer ring center
-    at_r = 2.0 + _norm(at_skew)  # inner ring center
-    fig = plt.figure(figsize=(5,5)); ax = plt.subplot(111, polar=True)
-    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
-    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
-    ax.plot(theta, gc_r, linewidth=1, label="GC skew")
-    ax.plot(theta, at_r, linewidth=1, label="AT skew")
+    gc_mag = np.percentile(np.abs(gc_skew), 99) or 1.0
+    at_mag = np.percentile(np.abs(at_skew), 99) or 1.0
+    
+    gc_spikes = scale * (gc_skew / gc_mag)
+    at_spikes = scale * (at_skew / at_mag)
+
+    gc_base_radius = 2.0
+    at_base_radius = 1.5
+    scale=0.05
+
+    fig = plt.figure(figsize=(6,6)); ax = plt.subplot(111, polar=True)
+    ax.plot(theta, np.full(N, gc_base_radius), linewidth=1, alpha=0.6)
+    ax.plot(theta, np.full(N, at_base_radius), linewidth=1, alpha=0.6)
+
+    gc_pos = gc_spikes >= 0; gc_neg = ~gc_pos
+    at_pos = at_spikes >= 0; at_neg = ~at_pos
+    if np.any(gc_pos): ax.vlines(theta[gc_pos], gc_base_radius, gc_base_radius + gc_spikes[gc_pos], colors="orange", linewidth=0.6)
+    if np.any(gc_neg): ax.vlines(theta[gc_neg], base_radius + gc_spikes[gc_neg], gc_base_radius, colors="purple", linewidth=0.6)
+    if np.any(at_pos): ax.vlines(theta[at_pos], at_base_radius, at_base_radius + at_spikes[at_pos], colors="orange", linewidth=0.6)
+    if np.any(at_neg): ax.vlines(theta[at_neg], at_base_radius + at_spikes[at_neg], at_base_radius, colors="blue", linewidth=0.6)    
+
     ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
-    ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.2))
-    plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
+    plt.tight_layout(); plt.savefig(out_path, dpi=220); plt.close()
 
 def visualize_genome_skews(fasta_path: Path, out_dir: Path, num_windows: int = 4096):
     """Create linear and circular GC/AT skew images for one genome."""
