@@ -618,11 +618,10 @@ def plot_within_group_distance_hist(input_csv: str,
                                     bins: int = 50,
                                     annotate_new: bool = False):
     """
-    Build a histogram of within-group pairwise Euclidean distances among reference samples
-    in 3D PCA space (PC1-3), and overlay vertical lines for each new sample equal to its
-    distance to the closest reference point (nearest neighbor in 3D).
-
-    Saves a single image to out_png.
+    Plot histograms of reference pairwise distances in 3D PCA:
+      - within-group (same y_multi)
+      - between-group (different y_multi)
+    Overlay vertical lines for each new sample at its nearest-reference distance.
     """
     feats_df = pd.read_csv(input_csv)
     if id_col not in feats_df.columns:
@@ -639,72 +638,107 @@ def plot_within_group_distance_hist(input_csv: str,
     X_std = _apply_standard_scaler(mdl_json["scaler"], X)
     X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
 
-    # Reference embedding + 3-class labels for "within-group" distances
+    # Reference embedding + labels
     train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)   # (n_ref, 3)
     y_multi  = mdl_json["training_embedding"].get("y_multi", None)
     if y_multi is None:
-        _err("kNNPC.json missing 'training_embedding.y_multi'. "
-             "Regenerate it to include both y (binary) and y_multi (1/2/3).")
+        _err("kNNPC.json missing 'training_embedding.y_multi'. Regenerate with y_multi.")
     y_multi = np.asarray(y_multi, dtype=int)
 
-    def _upper_triangle_pairwise(X3: np.ndarray) -> np.ndarray:
-        """Return Euclidean distances for upper triangle pairs (i<j) for 3D points."""
+    def _pairwise_upper(X3: np.ndarray) -> np.ndarray:
         n = X3.shape[0]
-        if n < 2:
-            return np.array([], dtype=float)
-        chunks = []
+        if n < 2: return np.array([], dtype=float)
+        out = []
         for i in range(n - 1):
-            diff = X3[i + 1:] - X3[i]
-            di = np.sqrt(np.sum(diff * diff, axis=1))
-            chunks.append(di)
-        return np.concatenate(chunks) if chunks else np.array([], dtype=float)
+            diff = X3[i+1:] - X3[i]
+            out.append(np.sqrt(np.sum(diff * diff, axis=1)))
+        return np.concatenate(out) if out else np.array([], dtype=float)
 
-    # Pool within-group distances across all three groups
+    # --- Within-group distances
     within_all = []
     for g in (1, 2, 3):
         grp = train_pc[y_multi == g]
         if grp.shape[0] >= 2:
-            within_all.append(_upper_triangle_pairwise(grp))
-    within_all = np.concatenate(within_all) if len(within_all) else np.array([], dtype=float)
+            within_all.append(_pairwise_upper(grp))
+    within_all = np.concatenate(within_all) if within_all else np.array([], dtype=float)
 
-    # For each new sample, get NN distance to ANY reference (closest ref, regardless of group)
-    nn_dists_new = []
+    # --- Between-group distances
+    idx1 = np.where(y_multi == 1)[0]
+    idx2 = np.where(y_multi == 2)[0]
+    idx3 = np.where(y_multi == 3)[0]
+    between_chunks = []
+    def _cross_pairs(A, B):
+        if A.size == 0 or B.size == 0: return
+        XA, XB = train_pc[A], train_pc[B]
+        d = np.sqrt(np.sum((XA[:, None, :] - XB[None, :, :])**2, axis=2)).ravel()
+        between_chunks.append(d)
+    _cross_pairs(idx1, idx2)
+    _cross_pairs(idx1, idx3)
+    _cross_pairs(idx2, idx3)
+    between_all = np.concatenate(between_chunks) if between_chunks else np.array([], dtype=float)
+
+    # Unknown-sample NN distances
     ids_new = feats_df[id_col].astype(str).values
-    for x in X_pc_new:
-        d = np.sqrt(np.sum((train_pc - x) ** 2, axis=1))
-        nn_dists_new.append(float(d.min()) if d.size else np.nan)
-    nn_dists_new = np.array(nn_dists_new, dtype=float)
+    if train_pc.size:
+        nn_dists_new = np.sqrt(np.sum((X_pc_new[:, None, :] - train_pc[None, :, :])**2, axis=2)).min(axis=1)
+    else:
+        nn_dists_new = np.full(X_pc_new.shape[0], np.nan, dtype=float)
 
-    # ---- Plot ----
-    plt.figure(figsize=(9, 4.5))
-    # Histogram of within-group ref-ref distances
-    plt.hist(within_all, bins=bins, alpha=0.6, color="gray", edgecolor="black")
-    plt.xlabel("Euclidean distance in 3D PC space")
-    plt.ylabel("Count")
-    plt.title("Within-group reference distances (hist) + new-sample NN distances (vertical lines)")
+    # --- Plot
+    plt.figure(figsize=(10, 5))
+    # Pick a shared range so the histograms line up
+    all_vals = []
+    if within_all.size: all_vals.append(within_all)
+    if between_all.size: all_vals.append(between_all)
+    if len(all_vals):
+        xmin = min(np.min(v) for v in all_vals)
+        xmax = max(np.max(v) for v in all_vals)
+        hist_range = (float(xmin), float(xmax))
+    else:
+        hist_range = None
 
-    # Overlay vertical lines for each new sample
+    # Draw histograms
+    handles = []
+    labels  = []
+    if within_all.size:
+        h = plt.hist(within_all, bins=bins, range=hist_range, alpha=0.45,
+                     color="gray", edgecolor="black", label="Within-group")
+        handles.append(h[2]); labels.append("Within-group")
+    if between_all.size:
+        h = plt.hist(between_all, bins=bins, range=hist_range, alpha=0.35,
+                     color="skyblue", edgecolor="black", label="Between-group")
+        handles.append(h[2]); labels.append("Between-group")
+
+    # Vertical lines for each new sample
     for i, d0 in enumerate(nn_dists_new):
         if np.isfinite(d0):
-            plt.axvline(d0, color="black", linestyle="--", alpha=0.85, linewidth=1)
-            if annotate_new:
-                plt.text(d0, plt.ylim()[1] * 0.95, ids_new[i],
-                         rotation=90, va="top", ha="right", fontsize=7)
+            plt.axvline(d0, color="black", linestyle="--", alpha=0.9, linewidth=1)
 
+    if handles:
+        plt.legend()
+    plt.xlabel("Euclidean distance in 3D PC space (PC1–PC3)")
+    plt.ylabel("Count")
+    plt.title("Reference distance distributions + NN distances of new samples")
     plt.tight_layout()
+
     out_png = str(out_png)
     plt.savefig(out_png, dpi=220)
     plt.close()
     print(f"[OK] Saved distance-confidence histogram → {out_png}")
-
 def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) -> np.ndarray:
     """
-    Compute PED.confidence for each row in feats_df using the kNNPC space:
-      1) Build the distribution of within-group (1,2,3) pairwise distances among
-         reference points in 3D PCA space.
+    Compute PED.confidence per row in feats_df using kNNPC space.
+
+    Steps
+      1) Build distributions of pairwise Euclidean distances among reference points
+         in 3D PCA space:
+           - within-group: pairs with the same y_multi ∈ {1,2,3}
+           - between-group: pairs with different y_multi
       2) For each new sample, compute its nearest-reference distance (in 3D PCA).
-      3) Convert that distance to a percentile in the within-group distribution
-         and return confidence = 1 - percentile (so smaller distance -> higher confidence).
+      3) Convert that distance to ECDF percentiles:
+           p_w = F_within(d_nn),  p_b = F_between(d_nn)
+      4) Define confidence = (1 - p_w) * (1 - p_b) ∈ [0,1].
+         (small d relative to within AND between → confidence near 1)
     """
     # Ensure feature order matches training
     feature_cols = mdl_json["feature_cols"]
@@ -715,50 +749,70 @@ def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) 
     X_std = _apply_standard_scaler(mdl_json["scaler"], X)
     X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
 
-    # Reference embedding + labels for within-group pairs
+    # Reference embedding + labels
     train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)   # (n_ref, 3)
     y_multi = mdl_json["training_embedding"].get("y_multi", None)
     if y_multi is None:
-        # If no multiclass labels are available, we can't form the within-group distribution
-        # Return NaNs and let the caller handle messaging.
         return np.full(X_pc_new.shape[0], np.nan, dtype=float)
     y_multi = np.asarray(y_multi, dtype=int)
 
-    # Pool within-group pairwise distances across groups 1/2/3
-    def _upper_triangle_pairwise(X3: np.ndarray) -> np.ndarray:
+    def _pairwise_upper(X3: np.ndarray) -> np.ndarray:
         n = X3.shape[0]
-        if n < 2:
-            return np.array([], dtype=float)
-        acc = []
+        if n < 2: return np.array([], dtype=float)
+        out = []
         for i in range(n - 1):
-            diff = X3[i + 1:] - X3[i]
-            di = np.sqrt(np.sum(diff * diff, axis=1))
-            acc.append(di)
-        return np.concatenate(acc) if acc else np.array([], dtype=float)
+            diff = X3[i+1:] - X3[i]
+            out.append(np.sqrt(np.sum(diff * diff, axis=1)))
+        return np.concatenate(out) if out else np.array([], dtype=float)
 
+    # --- Build within-group distribution
     within_all = []
     for g in (1, 2, 3):
         grp = train_pc[y_multi == g]
         if grp.shape[0] >= 2:
-            within_all.append(_upper_triangle_pairwise(grp))
+            within_all.append(_pairwise_upper(grp))
     within_all = np.concatenate(within_all) if within_all else np.array([], dtype=float)
 
-    # If we still don't have a distribution, return NaNs
-    if within_all.size == 0:
+    # --- Build between-group distribution
+    # collect indices per group then all cross-group pairs
+    idx1 = np.where(y_multi == 1)[0]
+    idx2 = np.where(y_multi == 2)[0]
+    idx3 = np.where(y_multi == 3)[0]
+    between_chunks = []
+    def _cross_pairs(A, B):
+        if A.size == 0 or B.size == 0: return
+        XA, XB = train_pc[A], train_pc[B]
+        # all pair distances between XA and XB
+        # (|A|,|B|,3) → (|A|,|B|)
+        d = np.sqrt(np.sum((XA[:, None, :] - XB[None, :, :])**2, axis=2)).ravel()
+        between_chunks.append(d)
+    _cross_pairs(idx1, idx2)
+    _cross_pairs(idx1, idx3)
+    _cross_pairs(idx2, idx3)
+    between_all = np.concatenate(between_chunks) if between_chunks else np.array([], dtype=float)
+
+    # If either distribution is missing, we can't compute the combined score reliably
+    if within_all.size == 0 or between_all.size == 0:
         return np.full(X_pc_new.shape[0], np.nan, dtype=float)
 
-    # Sort once for fast percentile lookup
+    # Sort once for fast ECDF lookups
     w_sorted = np.sort(within_all)
-    N = w_sorted.size
+    b_sorted = np.sort(between_all)
+    Nw, Nb = w_sorted.size, b_sorted.size
 
     # Nearest-reference distance for each new sample
     nn_dists = np.sqrt(np.sum((X_pc_new[:, None, :] - train_pc[None, :, :])**2, axis=2)).min(axis=1)
 
-    # Percentile p = ECDF(d) = (# within <= d) / N → confidence = 1 - p
-    ranks = np.searchsorted(w_sorted, nn_dists, side="right")
-    percentiles = ranks.astype(float) / float(N)
-    confidences = 1.0 - percentiles
-    return confidences
+    # ECDF percentiles
+    ranks_w = np.searchsorted(w_sorted, nn_dists, side="right")
+    p_w = ranks_w.astype(float) / float(Nw)
+
+    ranks_b = np.searchsorted(b_sorted, nn_dists, side="right")
+    p_b = ranks_b.astype(float) / float(Nb)
+
+    # Combined confidence: smaller is better vs both distributions
+    conf = (1.0 - p_w) * (1.0 - p_b)
+    return conf
 
 def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
