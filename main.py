@@ -511,19 +511,24 @@ def _predict_with_knnpc(model_json: dict, feats_df: pd.DataFrame, id_col: str) -
 
     return pd.DataFrame({id_col: ids, "polyploidy_pred": np.array(preds, dtype=int)})
 
-def plot_pca3_knnpc_ref3_newblack(input_csv: str,
-                                  model_path: str | Path,
-                                  id_col: str = "file",
-                                  out_png: str | Path = "pca3_positions.png",
-                                  point_size_ref: int = 12,
-                                  point_size_new: int = 8,
-                                  annotate_new: bool = False):
+def plot_pca3_knnpc_ref3_multi(input_csv: str,
+                               model_path: str | Path,
+                               id_col: str = "file",
+                               out_dir: str | Path = "image",
+                               base_name: str = "pca3_positions",
+                               point_size_ref: int = 18,
+                               point_size_new: int = 8,
+                               annotate_new: bool = False):
     """
-    Project samples into the 3D PCA space (from kNNPC.json) and plot:
-      - Reference (training) points: colored by 3-class labels (y_multi ∈ {1,2,3})
+    Project samples into the 3D PCA space (from kNNPC.json) and save multiple views:
+      - Reference (training) points colored by 3-class labels (y_multi ∈ {1,2,3})
           Group 1 -> orange, Group 2 -> limegreen, Group 3 -> skyblue
-      - New samples: large, black-edged open circles (no 3-class color)
+      - New samples: small gray points (no hollow circles)
+    Saves files:
+      <out_dir>/<base_name>_view01.png ... _view06.png
     """
+    import matplotlib.patches as mpatches
+
     feats_df = pd.read_csv(input_csv)
     if id_col not in feats_df.columns:
         _err(f"ID column '{id_col}' not found in input CSV.")
@@ -539,51 +544,72 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
     X_std = _apply_standard_scaler(mdl_json["scaler"], X)
     X_pc_new = _apply_pca(mdl_json["pca"], X_std)
 
-    # Reference embedding + labels (multiclass for coloring)
+    # Reference embedding + labels (multiclass for coloring in the plot)
     train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)
     y_multi = mdl_json["training_embedding"].get("y_multi", None)
     if y_multi is None:
         _err("kNNPC.json missing 'training_embedding.y_multi'. "
-             "Regenerate kNNPC.json with the exporter that saves both y (binary) and y_multi (1/2/3).")
+             "Regenerate kNNPC.json to include both y (binary) and y_multi (1/2/3).")
     y_multi = np.asarray(y_multi, dtype=int)
 
     # Colors for reference groups
     color_map = {1: "orange", 2: "limegreen", 3: "skyblue"}
     colors_ref = [color_map.get(int(lbl), "gray") for lbl in y_multi]
 
-    # --- Plot ---
-    fig = plt.figure(figsize=(7.6, 6.6))
-    ax = fig.add_subplot(111, projection="3d")
+    # Ensure output dir exists
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Reference cloud (colored by 3-class labels)
-    ax.scatter(train_pc[:, 0], train_pc[:, 1], train_pc[:, 2],
-               s=point_size_ref, c=colors_ref, alpha=0.45, depthshade=False, label="Reference")
+    # Define 6 diverse viewpoints (azimuth, elevation)
+    views = [
+        (  0, 20),
+        ( 45, 25),
+        ( 90, 30),
+        (135, 35),
+        (180, 20),
+        (225, 25),
+    ]
 
-    # New samples (open black circles)
-    ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
-               s=point_size_new, c="gray", alpha=0.9, depthshade=False, label="New samples")
-
-    if annotate_new:
-        for i, sid in enumerate(feats_df[id_col].astype(str).values):
-            ax.text(X_pc_new[i, 0], X_pc_new[i, 1], X_pc_new[i, 2],
-                    f"{sid}", fontsize=8, color="black", ha="center", va="bottom")
-
-    ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_zlabel("PC3")
-    ax.set_title("Samples in 3D PCA space (reference colored by 3 groups)")
-
+    # Common legend handles
     leg_items = [
         mpatches.Patch(color=color_map[1], label="Group 1"),
         mpatches.Patch(color=color_map[2], label="Group 2"),
         mpatches.Patch(color=color_map[3], label="Group 3"),
-        Line2D([0], [0], marker="o", color="gray", linestyle="none", markersize=6, label="New samples"),
+        mpatches.Patch(facecolor="gray", edgecolor="none", label="New samples"),
     ]
-    ax.legend(handles=leg_items, loc="best")
 
-    plt.tight_layout()
-    out_png = str(out_png)
-    plt.savefig(out_png, dpi=220)
-    plt.close()
-    print(f"[OK] Saved 3D PCA plot → {out_png}")
+    # Make one plot per view
+    for i, (az, el) in enumerate(views, start=1):
+        fig = plt.figure(figsize=(7.6, 6.6))
+        ax = fig.add_subplot(111, projection="3d")
+
+        # Reference cloud
+        ax.scatter(train_pc[:, 0], train_pc[:, 1], train_pc[:, 2],
+                   s=point_size_ref, c=colors_ref, alpha=0.5,
+                   depthshade=False, label="Reference")
+
+        # New samples: small gray points
+        ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
+                   s=point_size_new, c="gray", alpha=0.9,
+                   depthshade=False, label="New samples")
+
+        if annotate_new:
+            for j, sid in enumerate(feats_df[id_col].astype(str).values):
+                ax.text(X_pc_new[j, 0], X_pc_new[j, 1], X_pc_new[j, 2],
+                        f"{sid}", fontsize=8, color="black", ha="center", va="bottom")
+
+        ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_zlabel("PC3")
+        ax.view_init(elev=el, azim=az)
+        ax.set_title(f"3D PCA (view {i}: az={az}, el={el})")
+        ax.legend(handles=leg_items, loc="best")
+        plt.tight_layout()
+
+        out_png = out_dir / f"{base_name}_view{i:02d}.png"
+        plt.savefig(out_png, dpi=220)
+        plt.close()
+
+    print(f"[OK] Saved multi-view 3D PCA plots → {out_dir}/"
+          f"{base_name}_view01.png ... _view{len(views):02d}.png")
 
 def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
@@ -755,35 +781,37 @@ if __name__ == "__main__":
             model_path=args.model_path,
         )
         print(f"Prediction written to {pred_out}")
-    # ---- Generate 3D PCA plot when kNNPC.json is the active model ----
+    # ---- Generate multi-view 3D PCA plots when kNNPC.json is the active model ----
     using_knnpc = (args.model.lower() == "knnpc")
     if args.model_path:
         using_knnpc = using_knnpc or (Path(args.model_path).name.lower() == "knnpc.json")
 
     if using_knnpc:
         feats_csv = args.pred_input if args.pred_input else args.out
-        feats_path = Path(feats_csv)
 
         MODELS_DIR = Path(__file__).resolve().parent / "models"
         knnpc_path = MODELS_DIR / "kNNPC.json"
         if args.model_path:
             knnpc_path = Path(args.model_path)
 
-        if knnpc_path.exists():
-            # Save PCA plot into ./image just like the skew plots
-            img_dir = Path(args.folder) / "image"
-            img_dir.mkdir(exist_ok=True)
-            pc_png = img_dir / "pca3_positions.png"
+        # Put PCA view images into the same /image directory you already use
+        image_dir = Path(args.folder) / "image"
+        image_dir.mkdir(parents=True, exist_ok=True)
 
+        if knnpc_path.exists():
             try:
-                plot_pca3_knnpc_ref3_newblack(
+                plot_pca3_knnpc_ref3_multi(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
                     id_col=args.id_col,
-                    out_png=str(pc_png)
+                    out_dir=image_dir,
+                    base_name="pca3_positions",   # will create pca3_positions_view01..06.png
+                    point_size_ref=18,
+                    point_size_new=8,
+                    annotate_new=False
                 )
             except SystemExit:
                 # _err() already printed a helpful message; continue gracefully
                 pass
         else:
-            print(f"[info] kNNPC model file not found for 3D plot: {knnpc_path}")
+            print(f"[info] kNNPC model file not found for 3D plots: {knnpc_path}")
