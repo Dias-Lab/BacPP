@@ -561,7 +561,7 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
 
     # New samples (open black circles)
     ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
-               s=point_size_new, c="gray", alpha=0.5, depthshade=False, label="New samples")
+               s=point_size_new, c="gray", alpha=0.9, depthshade=False, label="New samples")
 
     if annotate_new:
         for i, sid in enumerate(feats_df[id_col].astype(str).values):
