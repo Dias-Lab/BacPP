@@ -782,8 +782,8 @@ if __name__ == "__main__":
                     id_col=args.id_col,
                     out_png=str(pc_png)
                 )
-    except SystemExit:
-        # _err() already printed a helpful message; continue gracefully
-        pass
+            except SystemExit:
+                # _err() already printed a helpful message; continue gracefully
+                pass
         else:
             print(f"[info] kNNPC model file not found for 3D plot: {knnpc_path}")
