@@ -611,6 +611,92 @@ def plot_pca3_knnpc_ref3_multi(input_csv: str,
     print(f"[OK] Saved multi-view 3D PCA plots → {out_dir}/"
           f"{base_name}_view01.png ... _view{len(views):02d}.png")
 
+def plot_within_group_distance_hist(input_csv: str,
+                                    model_path: str | Path,
+                                    id_col: str = "file",
+                                    out_png: str | Path = "distance_confidence.png",
+                                    bins: int = 50,
+                                    annotate_new: bool = False):
+    """
+    Build a histogram of within-group pairwise Euclidean distances among reference samples
+    in 3D PCA space (PC1-3), and overlay vertical lines for each new sample equal to its
+    distance to the closest reference point (nearest neighbor in 3D).
+
+    Saves a single image to out_png.
+    """
+    feats_df = pd.read_csv(input_csv)
+    if id_col not in feats_df.columns:
+        _err(f"ID column '{id_col}' not found in input CSV.")
+
+    mdl_json = _load_json(Path(model_path))
+
+    # Ensure feature order matches training
+    feature_cols = mdl_json["feature_cols"]
+    X_df = _ensure_columns(feats_df, feature_cols)
+    X = X_df.to_numpy(dtype=float)
+
+    # Standardize + PCA using saved params
+    X_std = _apply_standard_scaler(mdl_json["scaler"], X)
+    X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
+
+    # Reference embedding + 3-class labels for "within-group" distances
+    train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)   # (n_ref, 3)
+    y_multi  = mdl_json["training_embedding"].get("y_multi", None)
+    if y_multi is None:
+        _err("kNNPC.json missing 'training_embedding.y_multi'. "
+             "Regenerate it to include both y (binary) and y_multi (1/2/3).")
+    y_multi = np.asarray(y_multi, dtype=int)
+
+    def _upper_triangle_pairwise(X3: np.ndarray) -> np.ndarray:
+        """Return Euclidean distances for upper triangle pairs (i<j) for 3D points."""
+        n = X3.shape[0]
+        if n < 2:
+            return np.array([], dtype=float)
+        chunks = []
+        for i in range(n - 1):
+            diff = X3[i + 1:] - X3[i]
+            di = np.sqrt(np.sum(diff * diff, axis=1))
+            chunks.append(di)
+        return np.concatenate(chunks) if chunks else np.array([], dtype=float)
+
+    # Pool within-group distances across all three groups
+    within_all = []
+    for g in (1, 2, 3):
+        grp = train_pc[y_multi == g]
+        if grp.shape[0] >= 2:
+            within_all.append(_upper_triangle_pairwise(grp))
+    within_all = np.concatenate(within_all) if len(within_all) else np.array([], dtype=float)
+
+    # For each new sample, get NN distance to ANY reference (closest ref, regardless of group)
+    nn_dists_new = []
+    ids_new = feats_df[id_col].astype(str).values
+    for x in X_pc_new:
+        d = np.sqrt(np.sum((train_pc - x) ** 2, axis=1))
+        nn_dists_new.append(float(d.min()) if d.size else np.nan)
+    nn_dists_new = np.array(nn_dists_new, dtype=float)
+
+    # ---- Plot ----
+    plt.figure(figsize=(9, 4.5))
+    # Histogram of within-group ref-ref distances
+    plt.hist(within_all, bins=bins, alpha=0.6, color="gray", edgecolor="black")
+    plt.xlabel("Euclidean distance in 3D PC space")
+    plt.ylabel("Count")
+    plt.title("Within-group reference distances (hist) + new-sample NN distances (vertical lines)")
+
+    # Overlay vertical lines for each new sample
+    for i, d0 in enumerate(nn_dists_new):
+        if np.isfinite(d0):
+            plt.axvline(d0, color="black", linestyle="--", alpha=0.85, linewidth=1)
+            if annotate_new:
+                plt.text(d0, plt.ylim()[1] * 0.95, ids_new[i],
+                         rotation=90, va="top", ha="right", fontsize=7)
+
+    plt.tight_layout()
+    out_png = str(out_png)
+    plt.savefig(out_png, dpi=220)
+    plt.close()
+    print(f"[OK] Saved distance-confidence histogram → {out_png}")
+
 def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
     Rebuilds binary LogisticRegression prediction from saved scaler stats + coefficients.
@@ -829,8 +915,18 @@ if __name__ == "__main__":
                     point_size_new=8,
                     annotate_new=False
                 )
+                
+                plot_within_group_distance_hist(
+                    input_csv=feats_csv,
+                    model_path=knnpc_path,
+                    id_col=args.id_col,
+                    out_png=str(image_dir / "distance_confidence.png"),
+                    bins=50,
+                    annotate_new=False  # flip to True if you want sample IDs printed on the lines
+                )
             except SystemExit:
                 # _err() already printed a helpful message; continue gracefully
                 pass
         else:
             print(f"[info] kNNPC model file not found for 3D plots: {knnpc_path}")
+    
