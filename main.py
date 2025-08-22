@@ -862,12 +862,13 @@ def run_prediction(
     else:
         _err(f"Unknown model '{model}'. Choose from ['knnpc','mlg','xgb'].")
 
-    # Persist 2-column output
-    out = out[[id_col, "polyploidy_pred"]]
+    cols = [id_col, "polyploidy_pred"]
+    if "PED.confidence" in out.columns:
+        cols.append("PED.confidence")
+    out = out[cols]
     Path(output_csv).parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(output_csv, index=False)
     print(f"[OK] Wrote predictions → {output_csv}")
-
 # ---------- Optional CLI ----------
 
 if __name__ == "__main__":
