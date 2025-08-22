@@ -165,69 +165,77 @@ def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return out
 
 def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
-    file = df["file"]
     """
-    Add interaction terms:
-      X -> multiplication, I -> division (safe; NaN if denominator == 0).
+    Add interaction terms using legacy naming:
+      - Base GC cols: sr.gc, sa.gc, peak.dist.gc, index.dist.gc
+      - Base AT cols: sr.at, sa.at, peak.dist.at, index.dist.at
+      - Multiplication: A X B  (e.g., srXsa.gc)
+      - Division:       A I B  (e.g., srIsa.gc)  (safe; NaN if denom == 0)
     """
-    gc_sr = df["gc_sr"].to_numpy(float)
-    gc_sa = df["gc_sa"].to_numpy(float)
-    gc_pk = df["gc_peak.dist"].to_numpy(float)
-    gc_idx = df["gc_index.dist"].to_numpy(float)
-    at_sr = df["at_sr"].to_numpy(float)
-    at_sa = df["at_sa"].to_numpy(float)
-    at_pk = df["at_peak.dist"].to_numpy(float)
-    at_idx = df["at_index.dist"].to_numpy(float)
+    # Pull base features in legacy naming
+    # (these columns will be created in run_folder below)
+    sr_gc = df["sr.gc"].to_numpy(float)
+    sa_gc = df["sa.gc"].to_numpy(float)
+    pk_gc = df["peak.dist.gc"].to_numpy(float)
+    idx_gc = df["index.dist.gc"].to_numpy(float)
 
+    sr_at = df["sr.at"].to_numpy(float)
+    sa_at = df["sa.at"].to_numpy(float)
+    pk_at = df["peak.dist.at"].to_numpy(float)
+    idx_at = df["index.dist.at"].to_numpy(float)
+
+    # ---------- GC group interactions ----------
     # Multiplications
-    df["gc_srXsa"] = gc_sr * gc_sa
-    df["gc_srXpeak.dist"] = gc_sr * gc_pk
-    df["gc_srXindex.dist"] = gc_sr * gc_idx
-    df["gc_saXpeak.dist"] = gc_sa * gc_pk
-    df["gc_saXindex.dist"] = gc_sa * gc_idx
-    df["gc_peak.distXindex.dist"] = gc_pk * gc_idx
+    df["srXsa.gc"] = sr_gc * sa_gc
+    df["srXpeak.dist.gc"] = sr_gc * pk_gc
+    df["srXindex.dist.gc"] = sr_gc * idx_gc
+    df["saXpeak.dist.gc"] = sa_gc * pk_gc
+    df["saXindex.dist.gc"] = sa_gc * idx_gc
+    df["peak.distXindex.dist.gc"] = pk_gc * idx_gc
 
     # Divisions (A I B == A / B)
-    df["gc_srIsa"] = _safe_div(gc_sr, gc_sa)
-    df["gc_srIpeak.dist"] = _safe_div(gc_sr, gc_pk)
-    df["gc_srIindex.dist"] = _safe_div(gc_sr, gc_idx)
+    df["srIsa.gc"] = _safe_div(sr_gc,  sa_gc)
+    df["srIpeak.dist.gc"] = _safe_div(sr_gc,  pk_gc)
+    df["srIindex.dist.gc"] = _safe_div(sr_gc,  idx_gc)
 
-    df["gc_saIsr"] = _safe_div(gc_sa, gc_sr)
-    df["gc_saIpeak.dist"] = _safe_div(gc_sa, gc_pk)
-    df["gc_saIindex.dist"] = _safe_div(gc_sa, gc_idx)
+    df["saIsr.gc"] = _safe_div(sa_gc,  sr_gc)
+    df["saIpeak.dist.gc"] = _safe_div(sa_gc,  pk_gc)
+    df["saIindex.dist.gc"] = _safe_div(sa_gc,  idx_gc)
 
-    df["gc_peak.distIsr"] = _safe_div(gc_pk, gc_sr)
-    df["gc_peak.distIsa"] = _safe_div(gc_pk, gc_sa)
-    df["gc_peak.distIindex.dist"] = _safe_div(gc_pk, gc_idx)
+    df["peak.distIsr.gc"] = _safe_div(pk_gc,  sr_gc)
+    df["peak.distIsa.gc"] = _safe_div(pk_gc,  sa_gc)
+    df["peak.distIindex.dist.gc"] = _safe_div(pk_gc,  idx_gc)
 
-    df["gc_index.distIsr"] = _safe_div(gc_idx, gc_sr)
-    df["gc_index.distIsa"] = _safe_div(gc_idx, gc_sa)
-    df["gc_index.distIpeak.dist"] = _safe_div(gc_idx, gc_pk)
+    df["index.distIsr.gc"] = _safe_div(idx_gc, sr_gc)
+    df["index.distIsa.gc"] = _safe_div(idx_gc, sa_gc)
+    df["index.distIpeak.dist.gc"] = _safe_div(idx_gc, pk_gc)
 
+    # ---------- AT group interactions ----------
     # Multiplications
-    df["at_srXsa"] = at_sr * at_sa
-    df["at_srXpeak.dist"] = at_sr * at_pk
-    df["at_srXindex.dist"] = at_sr * at_idx
-    df["at_saXpeak.dist"] = at_sa * at_pk
-    df["at_saXindex.dist"] = at_sa * at_idx
-    df["at_peak.distXindex.dist"] = at_pk * at_idx
+    df["srXsa.at"] = sr_at * sa_at
+    df["srXpeak.dist.at"] = sr_at * pk_at
+    df["srXindex.dist.at"] = sr_at * idx_at
+    df["saXpeak.dist.at"] = sa_at * pk_at
+    df["saXindex.dist.at"] = sa_at * idx_at
+    df["peak.distXindex.dist.at"] = pk_at * idx_at
 
     # Divisions (A I B == A / B)
-    df["at_srIsa"] = _safe_div(at_sr, at_sa)
-    df["at_srIpeak.dist"] = _safe_div(at_sr, at_pk)
-    df["at_srIindex.dist"] = _safe_div(at_sr, at_idx)
+    df["srIsa.at"] = _safe_div(sr_at,  sa_at)
+    df["srIpeak.dist.at"] = _safe_div(sr_at,  pk_at)
+    df["srIindex.dist.at"] = _safe_div(sr_at,  idx_at)
 
-    df["at_saIsr"] = _safe_div(at_sa, at_sr)
-    df["at_saIpeak.dist"] = _safe_div(at_sa, at_pk)
-    df["at_saIindex.dist"] = _safe_div(at_sa, at_idx)
+    df["saIsr.at"] = _safe_div(sa_at,  sr_at)
+    df["saIpeak.dist.at"] = _safe_div(sa_at,  pk_at)
+    df["saIindex.dist.at"] = _safe_div(sa_at,  idx_at)
 
-    df["at_peak.distIsr"] = _safe_div(at_pk, at_sr)
-    df["at_peak.distIsa"] = _safe_div(at_pk, at_sa)
-    df["at_peak.distIindex.dist"] = _safe_div(at_pk, at_idx)
+    df["peak.distIsr.at"] = _safe_div(pk_at,  sr_at)
+    df["peak.distIsa.at"] = _safe_div(pk_at,  sa_at)
+    df["peak.distIindex.dist.at"] = _safe_div(pk_at,  idx_at)
 
-    df["at_index.distIsr"] = _safe_div(at_idx, at_sr)
-    df["at_index.distIsa"] = _safe_div(at_idx, at_sa)
-    df["at_index.distIpeak.dist"] = _safe_div(at_idx, at_pk)
+    df["index.distIsr.at"] = _safe_div(idx_at, sr_at)
+    df["index.distIsa.at"] = _safe_div(idx_at, sa_at)
+    df["index.distIpeak.dist.at"] = _safe_div(idx_at, pk_at)
+
     return df
 
 ## ---------- Batch runner ----------
@@ -262,19 +270,18 @@ def run_folder(
             at_skew, k3=k3, k4=k4, alpha=alpha
         )
         rows.append(
-            {
-                "file": fp.name,
-                "gc_sr": gc_sr,
-                "gc_sa": gc_sa,
-                "gc_peak.dist": gc_peak_dist,
-                "gc_index.dist": gc_index_dist,
-                "at_sr": at_sr,
-                "at_sa": at_sa,
-                "at_peak.dist": at_peak_dist,
-                "at_index.dist": at_index_dist,
-            }
-        )
-
+    {
+        "file": fp.name,
+        "sr.gc": gc_sr,
+        "sa.gc": gc_sa,
+        "peak.dist.gc": gc_peak_dist,
+        "index.dist.gc": gc_index_dist,
+        "sr.at": at_sr,
+        "sa.at": at_sa,
+        "peak.dist.at": at_peak_dist,
+        "index.dist.at": at_index_dist,
+    }
+)
     df = pd.DataFrame(rows)
     if add_interaction_terms and not df.empty:
         df = add_interactions(df)
@@ -653,6 +660,7 @@ if __name__ == "__main__":
                                   num_windows=args.num_windows)
         print(f"Saved images to {img_dir}")
 
+    
     df.to_csv(args.out, index=False)
     print(f"Wrote {args.out} with {len(df)} rows")
 
