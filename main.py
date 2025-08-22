@@ -1,4 +1,3 @@
-import sys
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -9,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import json
 import matplotlib.patches as mpatches
+import sys
 
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
