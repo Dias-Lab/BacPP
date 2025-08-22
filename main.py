@@ -515,7 +515,7 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
                                   id_col: str = "file",
                                   out_png: str | Path = "pca3_positions.png",
                                   point_size_ref: int = 12,
-                                  point_size_new: int = 70,
+                                  point_size_new: int = 8,
                                   annotate_new: bool = False):
     """
     Project samples into the 3D PCA space (from kNNPC.json) and plot:
@@ -560,8 +560,7 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
 
     # New samples (open black circles)
     ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
-               s=point_size_new, facecolors="none", edgecolors="black",
-               linewidths=1.0, alpha=1.0, depthshade=False, label="New samples")
+               s=point_size_new, c="gray", alpha=0.5, depthshade=False, label="New samples")
 
     if annotate_new:
         for i, sid in enumerate(feats_df[id_col].astype(str).values):
@@ -575,7 +574,7 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
         mpatches.Patch(color=color_map[1], label="Group 1"),
         mpatches.Patch(color=color_map[2], label="Group 2"),
         mpatches.Patch(color=color_map[3], label="Group 3"),
-        mpatches.Patch(facecolor="white", edgecolor="black", label="New samples"),
+        Line2D([0], [0], marker="o", color="gray", linestyle="none", markersize=6, label="New samples"),
     ]
     ax.legend(handles=leg_items, loc="best")
 
