@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import json
-
+import matplotlib.patches as mpatches
 
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
@@ -571,7 +571,6 @@ def plot_pca3_knnpc_ref3_newblack(input_csv: str,
     ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_zlabel("PC3")
     ax.set_title("Samples in 3D PCA space (reference colored by 3 groups)")
 
-    import matplotlib.patches as mpatches
     leg_items = [
         mpatches.Patch(color=color_map[1], label="Group 1"),
         mpatches.Patch(color=color_map[2], label="Group 2"),
@@ -619,8 +618,6 @@ def _predict_with_xgb(model_path: Path, feats_df: pd.DataFrame, id_col: str, fea
     p1 = mdl.predict_proba(X)[:, 1]
     yhat = (p1 >= 0.5).astype(int)
     return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat})
-
-
 
 def run_prediction(
     input_csv: str,
@@ -696,7 +693,6 @@ def run_prediction(
 # ---------- Optional CLI ----------
 
 if __name__ == "__main__":
-    import argparse
 
     p = argparse.ArgumentParser(description="Compute GC-skew and AT-skew FFT features for FASTA files.")
     p.add_argument("folder", type=str, help="Folder containing FASTA/FA/FNA files")
@@ -774,16 +770,20 @@ if __name__ == "__main__":
             knnpc_path = Path(args.model_path)
 
         if knnpc_path.exists():
-            pc_png = str(feats_path.with_name("pca3_positions.png"))
+            # Save PCA plot into ./image just like the skew plots
+            img_dir = Path(args.folder) / "image"
+            img_dir.mkdir(exist_ok=True)
+            pc_png = img_dir / "pca3_positions.png"
+
             try:
                 plot_pca3_knnpc_ref3_newblack(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
                     id_col=args.id_col,
-                    out_png=pc_png
+                    out_png=str(pc_png)
                 )
-            except SystemExit:
-                # _err() already printed a helpful message; continue gracefully
-                pass
+    except SystemExit:
+        # _err() already printed a helpful message; continue gracefully
+        pass
         else:
             print(f"[info] kNNPC model file not found for 3D plot: {knnpc_path}")
