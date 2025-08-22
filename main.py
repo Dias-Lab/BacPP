@@ -727,7 +727,7 @@ if __name__ == "__main__":
     p.add_argument("--k4", type=float, default=40.0)
     p.add_argument("--alpha", type=float, default=0.4)
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
-    p.add_argument("--out", type=str, default="extracted_features.csv", help="Output CSV path")
+    p.add_argument("--out", type=str, default=".", help="Output directory (default: current dir)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
 
     p.add_argument("--predict", action="store_true",
@@ -763,12 +763,19 @@ if __name__ == "__main__":
         print(f"Saved images to {img_dir}")
 
     
-    df.to_csv(args.out, index=False)
-    print(f"Wrote {args.out} with {len(df)} rows")
+    # Ensure output directory exists
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Define default extracted features path
+    features_path = out_dir / "extracted_features.csv"
+    df.to_csv(features_path, index=False)
+    print(f"Wrote {features_path} with {len(df)} rows")
 
     # ---- prediction ----
     if args.predict:
-        feats_csv = args.pred_input if args.pred_input else args.out
+        features_path = Path(args.pred_input) if args.pred_input else out_dir / "extracted_features.csv"
+        feats_csv = str(features_path)
         feats_path = Path(feats_csv)
         pred_out = args.pred_output if args.pred_output else str(feats_path.with_name("predictions.csv"))
 
@@ -795,7 +802,7 @@ if __name__ == "__main__":
             knnpc_path = Path(args.model_path)
 
         # Put PCA view images into the same /image directory you already use
-        image_dir = Path(args.folder) / "image"
+        image_dir = out_dir / "image"
         image_dir.mkdir(parents=True, exist_ok=True)
 
         if knnpc_path.exists():
