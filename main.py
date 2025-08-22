@@ -9,6 +9,7 @@ import argparse
 import json
 import matplotlib.patches as mpatches
 import sys
+from matplotlib.lines import Line2D
 
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
