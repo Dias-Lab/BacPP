@@ -558,8 +558,13 @@ def run_prediction(
         _err(f"ID column '{id_col}' not found in input CSV.")
 
     # Default model file names if not provided
+    MODELS_DIR = Path(__file__).resolve().parent / "models"
     if model_path is None:
-        default_map = {"knnpc": "kNNPC.json", "mlg": "MLG.json", "xgb": "XGBoost.json"}
+        default_map = {
+            "knnpc": MODELS_DIR / "kNNPC.json",
+            "mlg":   MODELS_DIR / "MLG.json",
+            "xgb":   MODELS_DIR / "XGBoost.json",
+        }
         model_path = default_map.get(model.lower())
     mdl_path = Path(model_path)
 
@@ -621,7 +626,7 @@ if __name__ == "__main__":
     p.add_argument("--model", default="knnpc", choices=["knnpc", "mlg", "xgb"],
                    help="Model to use for prediction if --predict is set. Default: knnpc")
     p.add_argument("--model-path", default=None,
-                   help="Path to model file (defaults to kNNPC.json / MLG.json / XGBoost.json in CWD).")
+                   help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
     p.add_argument("--id-col", default="file",
                    help="ID column name in the features CSV for prediction. Default: file")
     p.add_argument("--pred-input", default=None,
