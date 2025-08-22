@@ -1,4 +1,3 @@
-# gcsi_batch.py
 from __future__ import annotations
 import numpy as np
 import pandas as pd
@@ -9,7 +8,7 @@ import matplotlib.pyplot as plt
 # ---------- Core utilities ----------
 
 def read_first_fasta_sequence(path: Path) -> str:
-    """Read the first sequence from a FASTA/FA/FNA file (dependency-free)."""
+    """Read the first sequence from a FASTA/FA/FNA file."""
     seq_parts: List[str] = []
     with path.open("r", encoding="utf-8", errors="ignore") as fh:
         in_seq = False
@@ -17,7 +16,7 @@ def read_first_fasta_sequence(path: Path) -> str:
             if not line:
                 continue
             if line.startswith(">"):
-                if in_seq:  # already read first record
+                if in_seq: 
                     break
                 in_seq = True
                 continue
@@ -61,11 +60,7 @@ def gc_skew_vectorized(seq: str, num_windows: int = 4096) -> np.ndarray:
     return skews
 
 def at_skew_vectorized(seq: str, num_windows: int = 4096) -> np.ndarray:
-    """
-    Fully vectorized AT skew over num_windows:
-      window_size = floor(len(seq)/num_windows), last window takes remainder.
-      skew = (A - T) / (A + T), 0 if denom==0.
-    """
+    
     if num_windows <= 0:
         raise ValueError("num_windows must be positive")
 
@@ -240,7 +235,7 @@ def run_folder(
     k4: float = 40.0,
     alpha: float = 0.4,
     patterns: Tuple[str, ...] = ("*.fasta", "*.fa", "*.fna"),
-    add_interaction_terms: bool = True,   # enabled by default
+    add_interaction_terms: bool = True,
 ) -> pd.DataFrame:
     """
     Scan folder for FASTA/FA/FNA, compute features, and return a DataFrame:
@@ -332,51 +327,58 @@ def plot_linear_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_
     plt.xlabel("Window index"); plt.ylabel("Cumulative skew"); plt.title(title)
     plt.legend(loc="best"); plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
 
-#def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title: str, out_path: Path):
-#    """Circular (polar) plot of per-window GC/AT skew as two rings."""
-#    N = gc_skew.size
-#    theta = np.linspace(0, 2*np.pi, N, endpoint=False)
-#    def _norm(v):
-#        m = np.percentile(np.abs(v), 99) or 1.0
-#        return 0.05 * (v / m)
-
-#    gc_r = 2.0 + _norm(gc_skew)  # outer ring center
-#    at_r = 2.0 + _norm(at_skew)  # inner ring center
-
-#    fig = plt.figure(figsize=(5,5)); ax = plt.subplot(111, polar=True)
-#    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
-#    ax.plot(theta, np.full(N, 1.0), linewidth=1, alpha=0.5)
-#    ax.plot(theta, gc_r, linewidth=1, label="GC skew")
-#    ax.plot(theta, at_r, linewidth=1, label="AT skew")
-#    ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
-#    ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.2))
-#    plt.tight_layout(); plt.savefig(out_path, dpi=200); plt.close()
-
 def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title:str, out_path):
     N = gc_skew.size
     theta = np.linspace(0, 2*np.pi, N, endpoint=False)
-    gc_mag = np.percentile(np.abs(gc_skew), 99) or 1.0
-    at_mag = np.percentile(np.abs(at_skew), 99) or 1.0
-    
-    gc_spikes = scale * (gc_skew / gc_mag)
-    at_spikes = scale * (at_skew / at_mag)
+
+    # Fixed spike length in data units
+    max_len = 0.10
+
+    # Robust per-series normalization
+    gc_mag = np.percentile(np.abs(gc_skew), 99);  gc_mag = gc_mag if gc_mag else 1.0
+    at_mag = np.percentile(np.abs(at_skew), 99);  at_mag = at_mag if at_mag else 1.0
+
+    gc_spikes = np.clip((gc_skew / gc_mag) * max_len, -max_len, max_len)
+    at_spikes = np.clip((at_skew / at_mag) * max_len, -max_len, max_len)
 
     gc_base_radius = 2.0
-    at_base_radius = 1.5
-    scale=0.05
+    at_base_radius = 1.8
 
-    fig = plt.figure(figsize=(6,6)); ax = plt.subplot(111, polar=True)
+    # ---- Plotting parameters ----
+    r_pad = 0.05
+    r_max = max(gc_base_radius, at_base_radius) + max_len + r_pad
+    r_min = 0.0   # or a positive value if you want a fixed inner hole, e.g. 0.6
+    # ----------------------------------------------------------------------
+
+    fig = plt.figure(figsize=(6,6))
+    ax = plt.subplot(111, polar=True)
+
+    # Apply fixed limits before plotting spikes
+    ax.set_ylim(r_min, r_max)
+
+    # Baselines
     ax.plot(theta, np.full(N, gc_base_radius), linewidth=1, alpha=0.6)
     ax.plot(theta, np.full(N, at_base_radius), linewidth=1, alpha=0.6)
 
+    # GC spikes: + outward (orange), − inward (purple)
     gc_pos = gc_spikes >= 0; gc_neg = ~gc_pos
-    at_pos = at_spikes >= 0; at_neg = ~at_pos
-    if np.any(gc_pos): ax.vlines(theta[gc_pos], gc_base_radius, gc_base_radius + gc_spikes[gc_pos], colors="orange", linewidth=0.6)
-    if np.any(gc_neg): ax.vlines(theta[gc_neg], base_radius + gc_spikes[gc_neg], gc_base_radius, colors="purple", linewidth=0.6)
-    if np.any(at_pos): ax.vlines(theta[at_pos], at_base_radius, at_base_radius + at_spikes[at_pos], colors="orange", linewidth=0.6)
-    if np.any(at_neg): ax.vlines(theta[at_neg], at_base_radius + at_spikes[at_neg], at_base_radius, colors="blue", linewidth=0.6)    
+    if np.any(gc_pos):
+        ax.vlines(theta[gc_pos], gc_base_radius, gc_base_radius + gc_spikes[gc_pos],
+                  colors="orange", linewidth=0.6)
+    if np.any(gc_neg):
+        ax.vlines(theta[gc_neg], gc_base_radius + gc_spikes[gc_neg], gc_base_radius,
+                  colors="purple", linewidth=0.6)
 
-    ax.set_rticks([]); ax.set_xticks([]); ax.set_title(title, va='bottom')
+    # AT spikes: + outward (olive), − inward (gray)
+    at_pos = at_spikes >= 0; at_neg = ~at_pos
+    if np.any(at_pos):
+        ax.vlines(theta[at_pos], at_base_radius, at_base_radius + at_spikes[at_pos],
+                  colors="olive", linewidth=0.6)
+    if np.any(at_neg):
+        ax.vlines(theta[at_neg], at_base_radius + at_spikes[at_neg], at_base_radius,
+                  colors="gray", linewidth=0.6)
+
+    ax.set_rticks([]); ax.set_xticks([]); ax.text(0.5, 0.5, title, transform=ax.transAxes, va='center',ha='center',fontsize=12)
     plt.tight_layout(); plt.savefig(out_path, dpi=220); plt.close()
 
 def visualize_genome_skews(fasta_path: Path, out_dir: Path, num_windows: int = 4096):
@@ -385,9 +387,9 @@ def visualize_genome_skews(fasta_path: Path, out_dir: Path, num_windows: int = 4
     seq = read_first_fasta_sequence(fasta_path)
     gc_skew, at_skew, _, _ = compute_window_skews(seq, num_windows=num_windows)
     base = fasta_path.stem
-    plot_linear_skews(gc_skew, at_skew, f"{base} — cumulative GC/AT skew",
+    plot_linear_skews(gc_skew, at_skew, f"{base} — cumulative GC&AT skew",
                       out_dir / f"{base}_linear_skew.png")
-    plot_circular_skews(gc_skew, at_skew, f"{base} — circular GC/AT skew",
+    plot_circular_skews(gc_skew, at_skew, f"{base} — circular GC&AT skew",
                         out_dir / f"{base}_circular_skew.png")
 
 def batch_visualize(fasta_files: List[str], out_root: Path, num_windows: int = 4096):
