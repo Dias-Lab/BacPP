@@ -746,6 +746,18 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
+    # --- Normalize paths (accept with/without trailing slash) ---
+    args.folder = str(Path(args.folder).resolve())
+    args.out    = str(Path(args.out).resolve())
+
+    # Optional: normalize any optional paths if provided
+    if args.pred_input is not None:
+        args.pred_input  = str(Path(args.pred_input).resolve())
+    if args.pred_output is not None:
+        args.pred_output = str(Path(args.pred_output).resolve())
+    if args.model_path is not None:
+        args.model_path  = str(Path(args.model_path).resolve())
+
     # ---- Feature extraction ----
     df = run_folder(
         args.folder,
@@ -794,7 +806,7 @@ if __name__ == "__main__":
         using_knnpc = using_knnpc or (Path(args.model_path).name.lower() == "knnpc.json")
 
     if using_knnpc:
-        feats_csv = args.pred_input if args.pred_input else args.out
+        feats_csv = args.pred_input if args.pred_input else str(Path(args.out) / "extracted_features.csv")
 
         MODELS_DIR = Path(__file__).resolve().parent / "models"
         knnpc_path = MODELS_DIR / "kNNPC.json"
