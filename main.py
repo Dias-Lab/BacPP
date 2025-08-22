@@ -697,6 +697,69 @@ def plot_within_group_distance_hist(input_csv: str,
     plt.close()
     print(f"[OK] Saved distance-confidence histogram → {out_png}")
 
+def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) -> np.ndarray:
+    """
+    Compute PED.confidence for each row in feats_df using the kNNPC space:
+      1) Build the distribution of within-group (1,2,3) pairwise distances among
+         reference points in 3D PCA space.
+      2) For each new sample, compute its nearest-reference distance (in 3D PCA).
+      3) Convert that distance to a percentile in the within-group distribution
+         and return confidence = 1 - percentile (so smaller distance -> higher confidence).
+    """
+    # Ensure feature order matches training
+    feature_cols = mdl_json["feature_cols"]
+    X_df = _ensure_columns(feats_df, feature_cols)
+    X = X_df.to_numpy(dtype=float)
+
+    # Standardize + PCA using saved params
+    X_std = _apply_standard_scaler(mdl_json["scaler"], X)
+    X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
+
+    # Reference embedding + labels for within-group pairs
+    train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)   # (n_ref, 3)
+    y_multi = mdl_json["training_embedding"].get("y_multi", None)
+    if y_multi is None:
+        # If no multiclass labels are available, we can't form the within-group distribution
+        # Return NaNs and let the caller handle messaging.
+        return np.full(X_pc_new.shape[0], np.nan, dtype=float)
+    y_multi = np.asarray(y_multi, dtype=int)
+
+    # Pool within-group pairwise distances across groups 1/2/3
+    def _upper_triangle_pairwise(X3: np.ndarray) -> np.ndarray:
+        n = X3.shape[0]
+        if n < 2:
+            return np.array([], dtype=float)
+        acc = []
+        for i in range(n - 1):
+            diff = X3[i + 1:] - X3[i]
+            di = np.sqrt(np.sum(diff * diff, axis=1))
+            acc.append(di)
+        return np.concatenate(acc) if acc else np.array([], dtype=float)
+
+    within_all = []
+    for g in (1, 2, 3):
+        grp = train_pc[y_multi == g]
+        if grp.shape[0] >= 2:
+            within_all.append(_upper_triangle_pairwise(grp))
+    within_all = np.concatenate(within_all) if within_all else np.array([], dtype=float)
+
+    # If we still don't have a distribution, return NaNs
+    if within_all.size == 0:
+        return np.full(X_pc_new.shape[0], np.nan, dtype=float)
+
+    # Sort once for fast percentile lookup
+    w_sorted = np.sort(within_all)
+    N = w_sorted.size
+
+    # Nearest-reference distance for each new sample
+    nn_dists = np.sqrt(np.sum((X_pc_new[:, None, :] - train_pc[None, :, :])**2, axis=2)).min(axis=1)
+
+    # Percentile p = ECDF(d) = (# within <= d) / N → confidence = 1 - p
+    ranks = np.searchsorted(w_sorted, nn_dists, side="right")
+    percentiles = ranks.astype(float) / float(N)
+    confidences = 1.0 - percentiles
+    return confidences
+
 def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
     Rebuilds binary LogisticRegression prediction from saved scaler stats + coefficients.
@@ -772,6 +835,9 @@ def run_prediction(
     if model == "knnpc":
         mdl_json = _load_json(mdl_path)
         out = _predict_with_knnpc(mdl_json, feats, id_col)
+
+        ped_conf = _ped_confidences_knnpc(mdl_json, feats, id_col)
+        out["PED.confidence"] = ped_conf
 
     elif model == "mlg":
         mdl_json = _load_json(mdl_path)
