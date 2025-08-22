@@ -1,12 +1,14 @@
+import sys
 from __future__ import annotations
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import argparse
 import json
-import sys
+
 
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
@@ -508,6 +510,82 @@ def _predict_with_knnpc(model_json: dict, feats_df: pd.DataFrame, id_col: str) -
 
     return pd.DataFrame({id_col: ids, "polyploidy_pred": np.array(preds, dtype=int)})
 
+def plot_pca3_knnpc_ref3_newblack(input_csv: str,
+                                  model_path: str | Path,
+                                  id_col: str = "file",
+                                  out_png: str | Path = "pca3_positions.png",
+                                  point_size_ref: int = 12,
+                                  point_size_new: int = 70,
+                                  annotate_new: bool = False):
+    """
+    Project samples into the 3D PCA space (from kNNPC.json) and plot:
+      - Reference (training) points: colored by 3-class labels (y_multi ∈ {1,2,3})
+          Group 1 -> orange, Group 2 -> limegreen, Group 3 -> skyblue
+      - New samples: large, black-edged open circles (no 3-class color)
+    """
+    feats_df = pd.read_csv(input_csv)
+    if id_col not in feats_df.columns:
+        _err(f"ID column '{id_col}' not found in input CSV.")
+
+    mdl_json = _load_json(Path(model_path))
+
+    # Ensure feature order matches training
+    feature_cols = mdl_json["feature_cols"]
+    X_df = _ensure_columns(feats_df, feature_cols)
+    X = X_df.to_numpy(dtype=float)
+
+    # Standardize + PCA using saved params
+    X_std = _apply_standard_scaler(mdl_json["scaler"], X)
+    X_pc_new = _apply_pca(mdl_json["pca"], X_std)
+
+    # Reference embedding + labels (multiclass for coloring)
+    train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)
+    y_multi = mdl_json["training_embedding"].get("y_multi", None)
+    if y_multi is None:
+        _err("kNNPC.json missing 'training_embedding.y_multi'. "
+             "Regenerate kNNPC.json with the exporter that saves both y (binary) and y_multi (1/2/3).")
+    y_multi = np.asarray(y_multi, dtype=int)
+
+    # Colors for reference groups
+    color_map = {1: "orange", 2: "limegreen", 3: "skyblue"}
+    colors_ref = [color_map.get(int(lbl), "gray") for lbl in y_multi]
+
+    # --- Plot ---
+    fig = plt.figure(figsize=(7.6, 6.6))
+    ax = fig.add_subplot(111, projection="3d")
+
+    # Reference cloud (colored by 3-class labels)
+    ax.scatter(train_pc[:, 0], train_pc[:, 1], train_pc[:, 2],
+               s=point_size_ref, c=colors_ref, alpha=0.45, depthshade=False, label="Reference")
+
+    # New samples (open black circles)
+    ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
+               s=point_size_new, facecolors="none", edgecolors="black",
+               linewidths=1.0, alpha=1.0, depthshade=False, label="New samples")
+
+    if annotate_new:
+        for i, sid in enumerate(feats_df[id_col].astype(str).values):
+            ax.text(X_pc_new[i, 0], X_pc_new[i, 1], X_pc_new[i, 2],
+                    f"{sid}", fontsize=8, color="black", ha="center", va="bottom")
+
+    ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_zlabel("PC3")
+    ax.set_title("Samples in 3D PCA space (reference colored by 3 groups)")
+
+    import matplotlib.patches as mpatches
+    leg_items = [
+        mpatches.Patch(color=color_map[1], label="Group 1"),
+        mpatches.Patch(color=color_map[2], label="Group 2"),
+        mpatches.Patch(color=color_map[3], label="Group 3"),
+        mpatches.Patch(facecolor="white", edgecolor="black", label="New samples"),
+    ]
+    ax.legend(handles=leg_items, loc="best")
+
+    plt.tight_layout()
+    out_png = str(out_png)
+    plt.savefig(out_png, dpi=220)
+    plt.close()
+    print(f"[OK] Saved 3D PCA plot → {out_png}")
+
 def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
     Rebuilds binary LogisticRegression prediction from saved scaler stats + coefficients.
@@ -541,6 +619,8 @@ def _predict_with_xgb(model_path: Path, feats_df: pd.DataFrame, id_col: str, fea
     p1 = mdl.predict_proba(X)[:, 1]
     yhat = (p1 >= 0.5).astype(int)
     return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat})
+
+
 
 def run_prediction(
     input_csv: str,
@@ -679,3 +759,31 @@ if __name__ == "__main__":
             model_path=args.model_path,
         )
         print(f"Prediction written to {pred_out}")
+    # ---- Generate 3D PCA plot when kNNPC.json is the active model ----
+    using_knnpc = (args.model.lower() == "knnpc")
+    if args.model_path:
+        using_knnpc = using_knnpc or (Path(args.model_path).name.lower() == "knnpc.json")
+
+    if using_knnpc:
+        feats_csv = args.pred_input if args.pred_input else args.out
+        feats_path = Path(feats_csv)
+
+        MODELS_DIR = Path(__file__).resolve().parent / "models"
+        knnpc_path = MODELS_DIR / "kNNPC.json"
+        if args.model_path:
+            knnpc_path = Path(args.model_path)
+
+        if knnpc_path.exists():
+            pc_png = str(feats_path.with_name("pca3_positions.png"))
+            try:
+                plot_pca3_knnpc_ref3_newblack(
+                    input_csv=feats_csv,
+                    model_path=knnpc_path,
+                    id_col=args.id_col,
+                    out_png=pc_png
+                )
+            except SystemExit:
+                # _err() already printed a helpful message; continue gracefully
+                pass
+        else:
+            print(f"[info] kNNPC model file not found for 3D plot: {knnpc_path}")
