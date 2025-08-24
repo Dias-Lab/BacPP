@@ -58,7 +58,8 @@ In summary, BPP provides the following functions:
 
   
 # Outputs
-To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We validated it as polyploidy experimentally during stationary phase, which proves the predictive power of our tool. 
+To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We predicted it using BPP and then validated it as polyploidy experimentally during stationary phase, which proves the predictive power of our tool. Below is the demonstration of outputs for *C.freundii*:
+
 
 # Acknowledgement
 We are grateful to members from Dr. Raquel Dias lab for testing the tool and providing constructive feedbacks that perfectionate this package.
