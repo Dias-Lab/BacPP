@@ -1,0 +1,4 @@
+file,polyploidy_pred,PED.confidence
+Citrobacter_freundii_ATCC_8090.fasta,1,0.9767195925928703
+Escherichia_coli.fasta,0,1.0
+Synechocystis_sp_PCC_6803.fasta,1,1.0
