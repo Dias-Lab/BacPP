@@ -938,37 +938,38 @@ if __name__ == "__main__":
     p.add_argument("--k4", type=float, default=40.0)
     p.add_argument("--alpha", type=float, default=0.4)
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
-    p.add_argument("--out", type=str, default=str(OUTPUTS_DIR), help="Output directory (default: current dir)")
+    p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
 
-    p.add_argument("--predict", action="store_true",
-                   help="After feature extraction, run polyploidy prediction using a trained model.")
-    p.add_argument("--model", default="knnpc", choices=["knnpc", "mlg", "xgb"],
-                   help="Model to use for prediction if --predict is set. Default: knnpc")
-    p.add_argument("--model-path", default=None,
-                   help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
-    p.add_argument("--id-col", default="file",
-                   help="ID column name in the features CSV for prediction. Default: file")
-    p.add_argument("--pred-input", default=None,
-                   help="Optional: features CSV to use for prediction (overrides --out).")
-    p.add_argument("--pred-output", default=None,
-                   help="Optional: predictions CSV path (2 columns: ID, polyploidy_pred). "
+    p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
+    p.add_argument("--model", default="knnpc", choices=["knnpc", "mlg", "xgb"], help="Model to use for prediction if --predict is set. Default: knnpc")
+    p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
+    p.add_argument("--id-col", default="file", help="ID column name in the features CSV for prediction. Default: file")
+    p.add_argument("--pred-input", default=None, help="Optional: features CSV to use for prediction (overrides --out).")
+    p.add_argument("--pred-output", default=None, help="Optional: predictions CSV path (2 columns: ID, polyploidy_pred). "
                         "Default: <features_csv_dir>/predictions.csv")
 
     args = p.parse_args()
     
     # --- Normalize paths (accept with/without trailing slash) ---
     args.folder = str(Path(args.folder).resolve())
-    args.out    = str(Path(args.out).resolve())
-
-    # Set outputs to be under the input folder instead of main.py directory
-    OUTPUTS_DIR = Path(args.folder) / "outputs"
+    
+   # --- If user didn't provide --out, set it to <folder>/outputs ---
+    if args.out is None:
+        OUTPUTS_DIR = Path(args.folder) / "outputs"
+    else:
+        OUTPUTS_DIR = Path(args.out).resolve()
+    
+    # Set args.out to the resolved path for downstream consistency
+    args.out = str(OUTPUTS_DIR)
+    
+    # Always define IMAGES_DIR under the chosen OUTPUTS_DIR
     IMAGES_DIR = OUTPUTS_DIR / "images"
-
-    # Create directories if missing
+    
+    # Create directories
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
+    
     print(f"[OK] Outputs → {OUTPUTS_DIR}")
     print(f"[OK] Images  → {IMAGES_DIR}")
 
