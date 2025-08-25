@@ -13,6 +13,16 @@ from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
 
+# Base outputs folder
+OUTPUTS_DIR = Path.cwd() / "outputs"
+IMAGES_DIR = OUTPUTS_DIR / "images"
+
+# Create them if missing
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+print(f"[OK] Outputs → {OUTPUTS_DIR}")
+print(f"[OK] Images  → {IMAGES_DIR}")
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
 
@@ -410,7 +420,7 @@ def visualize_genome_skews(fasta_path: Path, out_dir: Path, num_windows: int = 4
 
 def batch_visualize(fasta_files: List[str], out_root: Path, num_windows: int = 4096):
     """Generate images for all genomes under out_root / 'image'."""
-    img_dir = out_root / "image"; img_dir.mkdir(parents=True, exist_ok=True)
+    img_dir = IMAGES_DIR; img_dir.mkdir(parents=True, exist_ok=True)
     for f in fasta_files:
         fp = Path(f)
         if fp.exists():
@@ -610,7 +620,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_html = out_dir / f"{base_name}.html"
+    out_html = IMAGE_DIR / f"{base_name}.html"
     # Write a standalone HTML you can open in any browser (no internet required)
     pio.write_html(fig, file=str(out_html), full_html=True, include_plotlyjs="cdn")
     print(f"[OK] Saved interactive 3D PCA plot → {out_html}")
@@ -725,7 +735,7 @@ def plot_within_group_distance_hist(input_csv: str,
     plt.title("Reference distance distributions + NN distances of new samples")
     plt.tight_layout()
 
-    out_png = str(out_png)
+    out_png = IMAGES_DIR / Path(out_png).name
     plt.savefig(out_png, dpi=220)
     plt.close()
     print(f"[OK] Saved distance-confidence histogram → {out_png}")
@@ -924,7 +934,7 @@ def run_prediction(
     if "PED.confidence" in out.columns:
         cols.append("PED.confidence")
     out = out[cols]
-    Path(output_csv).parent.mkdir(parents=True, exist_ok=True)
+    output_csv = OUTPUTS_DIR / Path(output_csv).name
     out.to_csv(output_csv, index=False)
     print(f"[OK] Wrote predictions → {output_csv}")
 # ---------- Optional CLI ----------
@@ -938,7 +948,7 @@ if __name__ == "__main__":
     p.add_argument("--k4", type=float, default=40.0)
     p.add_argument("--alpha", type=float, default=0.4)
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
-    p.add_argument("--out", type=str, default=".", help="Output directory (default: current dir)")
+    p.add_argument("--out", type=str, default=str(OUTPUTS_DIR), help="Output directory (default: current dir)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
 
     p.add_argument("--predict", action="store_true",
@@ -991,7 +1001,7 @@ if __name__ == "__main__":
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Define default extracted features path
-    features_path = out_dir / "extracted_features.csv"
+    features_path = OUTPUTS_DIR / "extracted_features.csv"
     df.to_csv(features_path, index=False)
     print(f"Wrote {features_path} with {len(df)} rows")
 
