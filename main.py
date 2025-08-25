@@ -13,7 +13,7 @@ from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
 
-# Fixed constants for GC/AT FFT feature scaling
+# Fixed constants for calculating spectrum amplitute (SA) - Arakawa et al., 2009
 K3 = 600.0
 K4 = 40.0
 ALPHA = 0.4
