@@ -624,10 +624,10 @@ def plot_within_group_distance_hist(input_csv: str,
                                     bins: int = 50,
                                     annotate_new: bool = False):
     """
-    Plot histograms of reference pairwise distances in 3D PCA:
-      - within-group (same y_multi)
-      - between-group (different y_multi)
-    Overlay vertical lines for each new sample at its nearest-reference distance.
+    Plot mirrored histograms of reference pairwise distances in 3D PCA:
+      - Within-group distribution on TOP.
+      - Between-group distribution on BOTTOM (mirrored).
+      - Overlay vertical dashed lines for NN distances of new samples.
     """
     feats_df = pd.read_csv(input_csv)
     if id_col not in feats_df.columns:
@@ -645,12 +645,13 @@ def plot_within_group_distance_hist(input_csv: str,
     X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
 
     # Reference embedding + labels
-    train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)   # (n_ref, 3)
+    train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)
     y_multi  = mdl_json["training_embedding"].get("y_multi", None)
     if y_multi is None:
         _err("kNNPC.json missing 'training_embedding.y_multi'. Regenerate with y_multi.")
     y_multi = np.asarray(y_multi, dtype=int)
 
+    # --- Pairwise distances
     def _pairwise_upper(X3: np.ndarray) -> np.ndarray:
         n = X3.shape[0]
         if n < 2: return np.array([], dtype=float)
@@ -669,9 +670,7 @@ def plot_within_group_distance_hist(input_csv: str,
     within_all = np.concatenate(within_all) if within_all else np.array([], dtype=float)
 
     # --- Between-group distances
-    idx1 = np.where(y_multi == 1)[0]
-    idx2 = np.where(y_multi == 2)[0]
-    idx3 = np.where(y_multi == 3)[0]
+    idx1, idx2, idx3 = np.where(y_multi == 1)[0], np.where(y_multi == 2)[0], np.where(y_multi == 3)[0]
     between_chunks = []
     def _cross_pairs(A, B):
         if A.size == 0 or B.size == 0: return
@@ -683,54 +682,47 @@ def plot_within_group_distance_hist(input_csv: str,
     _cross_pairs(idx2, idx3)
     between_all = np.concatenate(between_chunks) if between_chunks else np.array([], dtype=float)
 
-    # Unknown-sample NN distances
+    # --- Nearest-neighbor distances for new samples
     ids_new = feats_df[id_col].astype(str).values
-    if train_pc.size:
-        nn_dists_new = np.sqrt(np.sum((X_pc_new[:, None, :] - train_pc[None, :, :])**2, axis=2)).min(axis=1)
-    else:
-        nn_dists_new = np.full(X_pc_new.shape[0], np.nan, dtype=float)
+    nn_dists_new = (
+        np.sqrt(np.sum((X_pc_new[:, None, :] - train_pc[None, :, :])**2, axis=2)).min(axis=1)
+        if train_pc.size else np.full(X_pc_new.shape[0], np.nan, dtype=float)
+    )
 
-    # --- Plot
-    plt.figure(figsize=(10, 5))
-    # Pick a shared range so the histograms line up
+    # --- Shared histogram range
     all_vals = []
     if within_all.size: all_vals.append(within_all)
     if between_all.size: all_vals.append(between_all)
-    if len(all_vals):
-        xmin = min(np.min(v) for v in all_vals)
-        xmax = max(np.max(v) for v in all_vals)
-        hist_range = (float(xmin), float(xmax))
-    else:
-        hist_range = None
+    hist_range = (min(np.min(v) for v in all_vals), max(np.max(v) for v in all_vals)) if all_vals else None
 
-    # Draw histograms
-    handles = []
-    labels  = []
+    # --- Plot mirrored histogram
+    plt.figure(figsize=(12, 6))
     if within_all.size:
-        h = plt.hist(within_all, bins=bins, range=hist_range, alpha=0.45,
-                     color="gray", edgecolor="black", label="Within-group")
-        handles.append(h[2]); labels.append("Within-group")
+        plt.hist(within_all, bins=bins, range=hist_range, alpha=0.7,
+                 color="gray", edgecolor="black", label="Within-group")
     if between_all.size:
-        h = plt.hist(between_all, bins=bins, range=hist_range, alpha=0.35,
-                     color="skyblue", edgecolor="black", label="Between-group")
-        handles.append(h[2]); labels.append("Between-group")
+        plt.hist(between_all, bins=bins, range=hist_range, alpha=0.6,
+                 color="skyblue", edgecolor="black", label="Between-group",
+                 orientation="vertical", weights=-np.ones_like(between_all))
 
-    # Vertical lines for each new sample
-    for i, d0 in enumerate(nn_dists_new):
+    # --- Draw NN distances for new samples
+    for d0 in nn_dists_new:
         if np.isfinite(d0):
             plt.axvline(d0, color="black", linestyle="--", alpha=0.9, linewidth=1)
 
-    if handles:
-        plt.legend()
+    # Styling
+    plt.axhline(0, color="black", linewidth=0.8)
     plt.xlabel("Euclidean distance in 3D PC space (PC1–PC3)")
-    plt.ylabel("Count")
+    plt.ylabel("Count (top=within, bottom=between)")
     plt.title("Reference distance distributions + NN distances of new samples")
+    plt.legend(loc="upper right")
     plt.tight_layout()
 
     out_png = IMAGES_DIR / Path(out_png).name
     plt.savefig(out_png, dpi=220)
     plt.close()
     print(f"[OK] Saved distance-confidence histogram → {out_png}")
+                                        
 def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) -> np.ndarray:
     """
     Compute PED.confidence per row in feats_df using kNNPC space.
