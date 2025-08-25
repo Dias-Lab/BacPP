@@ -13,6 +13,10 @@ from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
 
+# Fixed constants for GC/AT FFT feature scaling
+K3 = 600.0
+K4 = 40.0
+ALPHA = 0.4
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
 
@@ -248,9 +252,6 @@ def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
 def run_folder(
     folder: str | Path,
     num_windows: int = 4096,
-    k3: float = 600.0,
-    k4: float = 40.0,
-    alpha: float = 0.4,
     patterns: Tuple[str, ...] = ("*.fasta", "*.fa", "*.fna"),
     add_interaction_terms: bool = True,
 ) -> pd.DataFrame:
@@ -268,11 +269,11 @@ def run_folder(
         seq = read_first_fasta_sequence(fp)
         gc_skew = gc_skew_vectorized(seq, num_windows=num_windows)
         gc_sr, gc_sa, gc_peak_dist, gc_index_dist = gcsi_features_from_gcskew(
-            gc_skew, k3=k3, k4=k4, alpha=alpha
+            gc_skew, k3=K3, k4=K4, alpha=ALPHA
         )
         at_skew = at_skew_vectorized(seq, num_windows=num_windows)
         at_sr, at_sa, at_peak_dist, at_index_dist = atsi_features_from_atskew(
-            at_skew, k3=k3, k4=k4, alpha=alpha
+            at_skew, k3=K3, k4=K4, alpha=ALPHA
         )
         rows.append(
     {
@@ -930,9 +931,6 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Compute GC-skew and AT-skew FFT features for FASTA files.")
     p.add_argument("folder", type=str, help="Folder containing FASTA/FA/FNA files")
     p.add_argument("--num-windows", type=int, default=4096, help="Number of windows (default: 4096)")
-    p.add_argument("--k3", type=float, default=600.0)
-    p.add_argument("--k4", type=float, default=40.0)
-    p.add_argument("--alpha", type=float, default=0.4)
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
@@ -981,9 +979,6 @@ if __name__ == "__main__":
     df = run_folder(
         args.folder,
         num_windows=args.num_windows,
-        k3=args.k3,
-        k4=args.k4,
-        alpha=args.alpha,
         add_interaction_terms=not args.no_interactions,
     )
 
