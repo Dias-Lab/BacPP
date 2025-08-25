@@ -812,7 +812,7 @@ def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) 
     conf = (1.0 - p_w) * (1.0 - p_b)
     return conf
 
-def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
+def _predict_with_lg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> pd.DataFrame:
     """
     Rebuilds binary LogisticRegression prediction from saved scaler stats + coefficients.
     """
@@ -828,7 +828,7 @@ def _predict_with_mlg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> 
     z = X_std @ coef.T + inter                                           # (m,1)
     p1 = _sigmoid(z).reshape(-1)
     yhat = (p1 >= 0.5).astype(int)
-    return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat})
+    return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat, "predicted.probability": p1})
 
 def _predict_with_xgb(model_path: Path, feats_df: pd.DataFrame, id_col: str, feature_cols: list) -> pd.DataFrame:
     """
@@ -844,19 +844,19 @@ def _predict_with_xgb(model_path: Path, feats_df: pd.DataFrame, id_col: str, fea
     mdl.load_model(str(model_path))
     p1 = mdl.predict_proba(X)[:, 1]
     yhat = (p1 >= 0.5).astype(int)
-    return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat})
+    return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat, "predicted.probability": p1})
 
 def run_prediction(
     input_csv: str,
     output_csv: str,
-    model: str = "knnpc",
+    model: str = "knn",
     id_col: str = "file",
     model_path: str | None = None,
 ):
     """
     Predict polyploidy (0/1) from a feature CSV using one of three models:
-      - 'knnpc' (default): kNN with StandardScaler + PCA(3) using kNNPC.json
-      - 'mlg': Logistic Regression with StandardScaler using MLG.json
+      - 'knn' (default): kNN with StandardScaler + PCA(3) using kNNPC.json
+      - 'lg': Logistic Regression with StandardScaler using MLG.json
       - 'xgb': XGBoost native booster using XGBoost.json
     Writes a 2-column CSV: [id_col, polyploidy_pred]
     """
@@ -872,8 +872,8 @@ def run_prediction(
     MODELS_DIR = Path(__file__).resolve().parent / "models"
     if model_path is None:
         default_map = {
-            "knnpc": MODELS_DIR / "kNNPC.json",
-            "mlg":   MODELS_DIR / "MLG.json",
+            "knn": MODELS_DIR / "kNNPC.json",
+            "lg":   MODELS_DIR / "MLG.json",
             "xgb":   MODELS_DIR / "XGBoost.json",
         }
         model_path = default_map.get(model.lower())
@@ -884,16 +884,16 @@ def run_prediction(
 
     # Dispatch per model
     model = model.lower()
-    if model == "knnpc":
+    if model == "knn":
         mdl_json = _load_json(mdl_path)
         out = _predict_with_knnpc(mdl_json, feats, id_col)
 
         ped_conf = _ped_confidences_knnpc(mdl_json, feats, id_col)
         out["PED.confidence"] = ped_conf
 
-    elif model == "mlg":
+    elif model == "lg":
         mdl_json = _load_json(mdl_path)
-        out = _predict_with_mlg(mdl_json, feats, id_col)
+        out = _predict_with_lg(mdl_json, feats, id_col)
 
     elif model == "xgb":
         # Need the exact training feature order; read from a sibling JSON that has 'feature_cols'
@@ -912,11 +912,13 @@ def run_prediction(
         out = _predict_with_xgb(mdl_path, feats, id_col, feature_cols)
 
     else:
-        _err(f"Unknown model '{model}'. Choose from ['knnpc','mlg','xgb'].")
+        _err(f"Unknown model '{model}'. Choose from ['knn','lg','xgb'].")
 
     cols = [id_col, "polyploidy_pred"]
     if "PED.confidence" in out.columns:
         cols.append("PED.confidence")
+    if "predicted.probability" in out.columns:
+        cols.append("predicted.probability")       # LG/XGB
     out = out[cols]
     output_csv = OUTPUTS_DIR / Path(output_csv).name
     out.to_csv(output_csv, index=False)
@@ -936,7 +938,7 @@ if __name__ == "__main__":
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
 
     p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
-    p.add_argument("--model", default="knnpc", choices=["knnpc", "mlg", "xgb"], help="Model to use for prediction if --predict is set. Default: knnpc")
+    p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
     p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
     p.add_argument("--id-col", default="file", help="ID column name in the features CSV for prediction. Default: file")
     p.add_argument("--pred-input", default=None, help="Optional: features CSV to use for prediction (overrides --out).")
@@ -1018,7 +1020,7 @@ if __name__ == "__main__":
         )
         print(f"Prediction written to {pred_out}")
     # ---- Generate multi-view 3D PCA plots when kNNPC.json is the active model ----
-    using_knnpc = (args.model.lower() == "knnpc")
+    using_knnpc = (args.model.lower() == "knn")
     if args.model_path:
         using_knnpc = using_knnpc or (Path(args.model_path).name.lower() == "knnpc.json")
 
