@@ -10,6 +10,8 @@ import json
 import matplotlib.patches as mpatches
 import sys
 from matplotlib.lines import Line2D
+import plotly.graph_objects as go
+import plotly.io as pio
 
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
@@ -511,24 +513,22 @@ def _predict_with_knnpc(model_json: dict, feats_df: pd.DataFrame, id_col: str) -
 
     return pd.DataFrame({id_col: ids, "polyploidy_pred": np.array(preds, dtype=int)})
 
-def plot_pca3_knnpc_ref3_multi(input_csv: str,
-                               model_path: str | Path,
-                               id_col: str = "file",
-                               out_dir: str | Path = "image",
-                               base_name: str = "pca3_positions",
-                               point_size_ref: int = 18,
-                               point_size_new: int = 8,
-                               annotate_new: bool = False):
+def plot_pca3_knnpc_ref3_plotly(input_csv: str,
+                                model_path: str | Path,
+                                id_col: str = "file",
+                                out_dir: str | Path = "image",
+                                base_name: str = "pca3_positions",
+                                point_size_ref: int = 6,
+                                point_size_new: int = 5,
+                                annotate_new: bool = False):
     """
-    Project samples into the 3D PCA space (from kNNPC.json) and save multiple views:
-      - Reference (training) points colored by 3-class labels (y_multi ∈ {1,2,3})
-          Group 1 -> orange, Group 2 -> limegreen, Group 3 -> skyblue
-      - New samples: small gray points (no hollow circles)
-    Saves files:
-      <out_dir>/<base_name>_view01.png ... _view06.png
-    """
-    import matplotlib.patches as mpatches
+    Project samples into the saved 3D PCA space and write an interactive HTML plot:
+      - Reference points colored by y_multi ∈ {1,2,3}.
+      - New samples in gray.
+      - Click-and-drag to rotate; scroll to zoom; hover for details.
 
+    Output: <out_dir>/<base_name>.html
+    """
     feats_df = pd.read_csv(input_csv)
     if id_col not in feats_df.columns:
         _err(f"ID column '{id_col}' not found in input CSV.")
@@ -542,9 +542,9 @@ def plot_pca3_knnpc_ref3_multi(input_csv: str,
 
     # Standardize + PCA using saved params
     X_std = _apply_standard_scaler(mdl_json["scaler"], X)
-    X_pc_new = _apply_pca(mdl_json["pca"], X_std)
+    X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
 
-    # Reference embedding + labels (multiclass for coloring in the plot)
+    # Reference embedding + labels (multiclass for coloring)
     train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)
     y_multi = mdl_json["training_embedding"].get("y_multi", None)
     if y_multi is None:
@@ -552,64 +552,68 @@ def plot_pca3_knnpc_ref3_multi(input_csv: str,
              "Regenerate kNNPC.json to include both y (binary) and y_multi (1/2/3).")
     y_multi = np.asarray(y_multi, dtype=int)
 
-    # Colors for reference groups
+    # Colors for reference groups (same palette you used)
     color_map = {1: "orange", 2: "limegreen", 3: "skyblue"}
-    colors_ref = [color_map.get(int(lbl), "gray") for lbl in y_multi]
 
-    # Ensure output dir exists
+    # Build Plotly traces: one per reference group + one for new samples
+    traces = []
+    for g in (1, 2, 3):
+        mask = (y_multi == g)
+        if np.any(mask):
+            traces.append(
+                go.Scatter3d(
+                    x=train_pc[mask, 0],
+                    y=train_pc[mask, 1],
+                    z=train_pc[mask, 2],
+                    mode="markers",
+                    name=f"Group {g}",
+                    marker=dict(size=point_size_ref, color=color_map[g], opacity=0.7),
+                    hovertemplate=("Reference<br>"
+                                   "Group: " + str(g) + "<br>"
+                                   "PC1: %{x:.3f}<br>PC2: %{y:.3f}<br>PC3: %{z:.3f}<extra></extra>")
+                )
+            )
+
+    # New samples trace
+    new_ids = feats_df[id_col].astype(str).values
+    traces.append(
+        go.Scatter3d(
+            x=X_pc_new[:, 0],
+            y=X_pc_new[:, 1],
+            z=X_pc_new[:, 2],
+            mode="markers+text" if annotate_new else "markers",
+            name="New samples",
+            marker=dict(size=point_size_new, color="gray", opacity=0.95),
+            text=new_ids if annotate_new else None,
+            textposition="top center",
+            hovertemplate=("New sample<br>"
+                           f"{id_col}: %{text}<br>"
+                           "PC1: %{x:.3f}<br>PC2: %{y:.3f}<br>PC3: %{z:.3f}<extra></extra>")
+        )
+    )
+
+    fig = go.Figure(data=traces)
+    fig.update_layout(
+        title="3D PCA — Reference vs New Samples",
+        legend=dict(x=0.02, y=0.98),
+        margin=dict(l=0, r=0, t=40, b=0),
+        scene=dict(
+            xaxis_title="PC1",
+            yaxis_title="PC2",
+            zaxis_title="PC3",
+            xaxis=dict(showspikes=False),
+            yaxis=dict(showspikes=False),
+            zaxis=dict(showspikes=False),
+            aspectmode="data"
+        )
+    )
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Define 6 diverse viewpoints (azimuth, elevation)
-    views = [
-        (  0, 20),
-        ( 45, 25),
-        ( 90, 30),
-        (135, 35),
-        (180, 20),
-        (225, 25),
-    ]
-
-    # Common legend handles
-    leg_items = [
-        mpatches.Patch(color=color_map[1], label="Group 1"),
-        mpatches.Patch(color=color_map[2], label="Group 2"),
-        mpatches.Patch(color=color_map[3], label="Group 3"),
-        mpatches.Patch(facecolor="gray", edgecolor="none", label="New samples"),
-    ]
-
-    # Make one plot per view
-    for i, (az, el) in enumerate(views, start=1):
-        fig = plt.figure(figsize=(7.6, 6.6))
-        ax = fig.add_subplot(111, projection="3d")
-
-        # Reference cloud
-        ax.scatter(train_pc[:, 0], train_pc[:, 1], train_pc[:, 2],
-                   s=point_size_ref, c=colors_ref, alpha=0.5,
-                   depthshade=False, label="Reference")
-
-        # New samples: small gray points
-        ax.scatter(X_pc_new[:, 0], X_pc_new[:, 1], X_pc_new[:, 2],
-                   s=point_size_new, c="gray", alpha=0.9,
-                   depthshade=False, label="New samples")
-
-        if annotate_new:
-            for j, sid in enumerate(feats_df[id_col].astype(str).values):
-                ax.text(X_pc_new[j, 0], X_pc_new[j, 1], X_pc_new[j, 2],
-                        f"{sid}", fontsize=8, color="black", ha="center", va="bottom")
-
-        ax.set_xlabel("PC1"); ax.set_ylabel("PC2"); ax.set_zlabel("PC3")
-        ax.view_init(elev=el, azim=az)
-        ax.set_title(f"3D PCA (view {i}: az={az}, el={el})")
-        ax.legend(handles=leg_items, loc="best")
-        plt.tight_layout()
-
-        out_png = out_dir / f"{base_name}_view{i:02d}.png"
-        plt.savefig(out_png, dpi=220)
-        plt.close()
-
-    print(f"[OK] Saved multi-view 3D PCA plots → {out_dir}/"
-          f"{base_name}_view01.png ... _view{len(views):02d}.png")
+    out_html = out_dir / f"{base_name}.html"
+    # Write a standalone HTML you can open in any browser (no internet required)
+    pio.write_html(fig, file=str(out_html), full_html=True, include_plotlyjs="cdn")
+    print(f"[OK] Saved interactive 3D PCA plot → {out_html}")
 
 def plot_within_group_distance_hist(input_csv: str,
                                     model_path: str | Path,
@@ -1014,40 +1018,39 @@ if __name__ == "__main__":
 
     if using_knnpc:
         feats_csv = args.pred_input if args.pred_input else str(Path(args.out) / "extracted_features.csv")
-
+    
         MODELS_DIR = Path(__file__).resolve().parent / "models"
         knnpc_path = MODELS_DIR / "kNNPC.json"
         if args.model_path:
             knnpc_path = Path(args.model_path)
-
-        # Put PCA view images into the same /image directory you already use
+    
         image_dir = out_dir / "image"
         image_dir.mkdir(parents=True, exist_ok=True)
-
+    
         if knnpc_path.exists():
             try:
-                plot_pca3_knnpc_ref3_multi(
+                # NEW: interactive Plotly 3D PCA (HTML)
+                plot_pca3_knnpc_ref3_plotly(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
                     id_col=args.id_col,
                     out_dir=image_dir,
-                    base_name="pca3_positions",   # will create pca3_positions_view01..06.png
-                    point_size_ref=18,
-                    point_size_new=8,
+                    base_name="pca3_positions_interactive",
+                    point_size_ref=6,
+                    point_size_new=5,
                     annotate_new=False
                 )
-                
+    
+                # Keep your distance histogram (matplotlib PNG)
                 plot_within_group_distance_hist(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
                     id_col=args.id_col,
                     out_png=str(image_dir / "distance_confidence.png"),
                     bins=50,
-                    annotate_new=False  # flip to True if you want sample IDs printed on the lines
+                    annotate_new=False
                 )
             except SystemExit:
-                # _err() already printed a helpful message; continue gracefully
                 pass
         else:
             print(f"[info] kNNPC model file not found for 3D plots: {knnpc_path}")
-    
