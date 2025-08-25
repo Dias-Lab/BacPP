@@ -41,11 +41,11 @@ In summary, BPP provides the following functions:
   Extracted features including GC skew and AT skew will be provided for researchers interested in visualizing any bacterial chromosome for their own studies. Given baceria have a wide diversity of genomic structure, e.g. some species such as *Borrelia sp.* have linear chromosomes while most bacterial species possess circular chromosomes, both circular and linear GC skew and AT skew will be provided.
   
 - **Prediction of monoploidy/polyploidy based on extracted features**:
-  Use one of the pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy. Based on the dataset summarized from previous works, kNN currently has the highest prediction accuracy. Below is a table for comparing performacne of three models.
+  Use one of the pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy. Based on the dataset summarized from previous works, kNN currently has the highest prediction accuracy. Below is a table for comparing performance of three models.
 
   | Model | Overall Accuracy | Monoploidy Accuracy | Monoploidy Precision | Monoploidy Recall | Monoploidy F1 score | Polyploidy Accuracy | Polyploidy Precision | Polyploidy Recall | Polyploidy F1 score |
   | :-------: | :------: | :-------: | :-------: | :-------: | :-------: | :------: | :-------: | :-------: | :-------: |
-  | Multinomial Logistic regression | 0.675 | 0.625 | 0.588 | 0.625 | 0.606 | 0.708 | 0.739 | 0.708 | 0.723 |
+  | Logistic regression | 0.675 | 0.625 | 0.588 | 0.625 | 0.606 | 0.708 | 0.739 | 0.708 | 0.723 |
   | XGBoost | 0.725 | 0.750 | 0.632 | 0.750 | 0.686 | 0.708 | 0.810 | 0.708 | 0.756 |
   | k-nearest neighbor | 0.725 | 0.500 | 0.727 | 0.500 | 0.593 | 0.875 | 0.724 | 0.875 | 0.792 |
 
@@ -57,9 +57,16 @@ In summary, BPP provides the following functions:
   to quantify the relative confidence of the prediction. Additionally, PCA space formed by first three principal components will be visualized as well with sampling data and reference data. If using multinomial logistic regression or XGBoost, prediction confidence will be given as the output of predict.proba() function under scikit-learn package.
   
 # Outputs
-To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We predicted it using BPP. Below is the demonstration of outputs for three species. Chromosome of *C.freundii* is visualized in forms of global GC skew and AT skew in circular representation (a) and linear representation (b). In panel (a), the outer ring represents global GC skew with positive and negative skew values in orange and purple colors, respecively; the inner ring represents global AT skew with positive and negative skew values in .  Additionally
 (\autoref{fig:examples})
+To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We predicted it using BPP. Below is the demonstration of outputs for three species. Chromosome of *C.freundii* is visualized in forms of global GC skew and AT skew in circular representation (a) and linear representation (b). In panel (a), the outer ring represents global GC skew with positive and negative skew values in orange and purple colors, respecively; the inner ring represents global AT skew with positive and negative skew values in olive and grey colors, respectively. In panel (b), cumulative GC skew (blue) and AT skew (orange) are illustrated in different color. Additionally, two more plots are provided to help users assess the confidence of the prediction. (c) an interactive 3-dimentional PCA plot is generated and saved as the .html file. Below is a screenshot of the illustration, where orange (group 1: monoploidy), green (group 2: polyploidy with similar genomic architecture with group 1), and blue (polyploidy with divergent architecture in contrast to group 1) represents three groups of reference bacterial species with known ploidy. Samples for prediction is included in the scatter plot as black points. The name of the sample will be appear upon hovering above the point. (d) Pairwise Euclidean distance for reference samples within the same group (black) and between two different groups (blue) are enumerated which forms two distributions. The Euclidean distance between every sample for prediction and its nearest reference sample is calculated and included on the histogram to help assess the confidence of the prediction. 
 ![BacterialPloidyPredictor.\label{fig:examples}](figures/example_outputs.png)
+
+The main prediction and prediction confidence are saved in the main output file prediction.csv:
+| file | polyploidy_pred | PED.confidence |
+| :-------: | :------: | :-------: | 
+| Citrobacter_freundii_ATCC_8090.fasta | 1 | '0.9767195925928703 |
+| Escherichia_coli.fasta | 0.725 | 0 | 1 |
+| Synechocystis_sp_PCC_6803.fasta | 1 | 1 |
 
 # Acknowledgement
 We are grateful to members from Dr. Raquel Dias lab for testing the tool and providing constructive feedbacks that perfectionate this package.
