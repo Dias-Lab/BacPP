@@ -13,12 +13,6 @@ from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
 
-# Create them if missing
-OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
-print(f"[OK] Outputs → {OUTPUTS_DIR}")
-print(f"[OK] Images  → {IMAGES_DIR}")
 # ---------- DATA PREPROCESSING ----------
 ## ---------- Core utilities ----------
 
