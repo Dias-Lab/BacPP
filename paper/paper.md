@@ -55,10 +55,9 @@ In summary, BPP provides the following functions:
   $PED.confidence=(1-q_{in})*(1-q_{btw})$
   
   to quantify the relative confidence of the prediction. Additionally, PCA space formed by first three principal components will be visualized as well with sampling data and reference data. If using multinomial logistic regression or XGBoost, prediction confidence will be given as the output of predict.proba() function under scikit-learn package.
-
   
 # Outputs
-To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We predicted it using BPP and then validated it as polyploidy experimentally during stationary phase, which proves the predictive power of our tool. Below is the demonstration of outputs for *C.freundii*:
+To demonstarte, we ran BPP using three complete genome files from species *Escherichia coli*, *Synechocystis sp. PCC 6803*, and *Citrobacter freundii*. *E.coli* and *Synechocystis sp. PCC 6803* has been revealed in previous works as monoploid and polyploid bacteria, respectively; while *C.freundii* has never been tested before. Therefore, *C.freundii* was used as a species for testing the performance of our model. We predicted it using BPP. Below is the demonstration of outputs for three species. Chromosome of *C.freundii* is visualized in forms of global GC skew and AT skew in circular representation (a) and linear representation (b). In panel (a), the outer ring represents global GC skew with positive and negative skew values in orange and purple colors, respecively; the inner ring represents global AT skew with positive and negative skew values in .  Additionally
 (\autoref{fig:examples})
 ![BacterialPloidyPredictor.\label{fig:examples}](figures/example_outputs.png)
 
