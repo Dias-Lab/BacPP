@@ -43,11 +43,11 @@ In summary, BPP provides the following functions:
 - **Prediction of monoploidy/polyploidy based on extracted features**:
   Use one of the pre-trained models including logistic regression, XGBoost, or kNN (default) to predict the species being monoploidy or polyploidy. Based on the dataset summarized from previous works, kNN currently has the highest prediction accuracy. Below is a table for comparing performacne of three models.
 
-  | Model | Accuracy | Precision | Recall | F1 score |
-  | :-------: | :------: | :-------: | :-------: | :-------: |
-  | Multinomial Logistic regression | 0.675 | - | - | - |
-  | XGBoost | 0.700 | - | - | - |
-  | k-nearest neighbor | 0.725 | - | - | - |
+  | Model | Overall Accuracy | Monoploidy Accuracy | Monoploidy Precision | Monoploidy Recall | Monoploidy F1 score | Polyploidy Accuracy | Polyploidy Precision | Polyploidy Recall | Polyploidy F1 score |
+  | :-------: | :------: | :-------: | :-------: | :-------: | :-------: | :------: | :-------: | :-------: | :-------: |
+  | Multinomial Logistic regression | 0.675 | 0.625 | 0.588 | 0.625 | 0.606 | 0.708 | 0.739 | 0.708 | 0.723 |
+  | XGBoost | 0.725 | 0.750 | 0.632 | 0.750 | 0.686 | 0.708 | 0.810 | 0.708 | 0.756 |
+  | k-nearest neighbor | 0.725 | 0.500 | 0.727 | 0.500 | 0.593 | 0.875 | 0.724 | 0.875 | 0.792 |
 
 - **Estimation of prediction confidence**:
   If using kNN (default), the Euclidean distance in PC1-PC2-PC3 space between each individual sample point and its nearest reference point will be calculated and placed in the distribution of pairwise Euclidean distance among reference data either from the same group (within-group distance distribution) or different groups (between-group distance distribution) to calculate the quantile of the sample distance in two distributions ($q_{in}$ for within-group quantile, and $q_{btw}$ for between group quantile). We termed PED.confidence (pairwise Euclidean Distance-based confidence) as:
