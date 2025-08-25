@@ -1,17 +1,21 @@
 from __future__ import annotations
-import numpy as np
-import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.lines import Line2D
+from concurrent.futures import ProcessPoolExecutor
+from itertools import repeat
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 import argparse
 import json
 import matplotlib.patches as mpatches
 import sys
-from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
+import os
+#parallelization needed, incorporation of CheckM2 needed
 
 # Fixed constants for calculating spectrum amplitute (SA) - Arakawa et al., 2009
 K3 = 600.0
@@ -254,6 +258,7 @@ def run_folder(
     num_windows: int = 4096,
     patterns: Tuple[str, ...] = ("*.fasta", "*.fa", "*.fna"),
     add_interaction_terms: bool = True,
+    cpus: int = 1,
 ) -> pd.DataFrame:
     """
     Scan folder for FASTA/FA/FNA, compute features, and return a DataFrame:
@@ -263,30 +268,16 @@ def run_folder(
     files: List[Path] = []
     for pat in patterns:
         files.extend(sorted(folder.glob(pat)))
-
-    rows = []
-    for fp in files:
-        seq = read_first_fasta_sequence(fp)
-        gc_skew = gc_skew_vectorized(seq, num_windows=num_windows)
-        gc_sr, gc_sa, gc_peak_dist, gc_index_dist = gcsi_features_from_gcskew(
-            gc_skew, k3=K3, k4=K4, alpha=ALPHA
-        )
-        at_skew = at_skew_vectorized(seq, num_windows=num_windows)
-        at_sr, at_sa, at_peak_dist, at_index_dist = atsi_features_from_atskew(
-            at_skew, k3=K3, k4=K4, alpha=ALPHA
-        )
-        rows.append(
-    {
-        "file": fp.name,
-        "sr.gc": gc_sr,
-        "sa.gc": gc_sa,
-        "peak.dist.gc": gc_peak_dist,
-        "index.dist.gc": gc_index_dist,
-        "sr.at": at_sr,
-        "sa.at": at_sa,
-        "peak.dist.at": at_peak_dist,
-        "index.dist.at": at_index_dist,
-    }
+    
+    if cpus is None or cpus < 1:
+        cpus = 1
+    
+    if cpus == 1 or len(files) <= 1:
+        rows = [_compute_features_for_file(fp, num_windows) for fp in files]
+    else:
+        # Preserve input order by using ex.map with itertools.repeat
+        with ProcessPoolExecutor(max_workers=cpus) as ex:
+            rows = list(ex.map(_compute_features_for_file, files, repeat(num_windows), chunksize=1))
 )
     df = pd.DataFrame(rows)
     if add_interaction_terms and not df.empty:
@@ -924,6 +915,28 @@ def run_prediction(
     output_csv = OUTPUTS_DIR / Path(output_csv).name
     out.to_csv(output_csv, index=False)
     print(f"[OK] Wrote predictions → {output_csv}")
+
+def _compute_features_for_file(fp: Path, num_windows: int) -> dict:
+    seq = read_first_fasta_sequence(fp)
+    gc_skew = gc_skew_vectorized(seq, num_windows=num_windows)
+    gc_sr, gc_sa, gc_peak_dist, gc_index_dist = gcsi_features_from_gcskew(
+        gc_skew, k3=K3, k4=K4, alpha=ALPHA
+    )
+    at_skew = at_skew_vectorized(seq, num_windows=num_windows)
+    at_sr, at_sa, at_peak_dist, at_index_dist = atsi_features_from_atskew(
+        at_skew, k3=K3, k4=K4, alpha=ALPHA
+    )
+    return {
+        "file": fp.name,
+        "sr.gc": gc_sr,
+        "sa.gc": gc_sa,
+        "peak.dist.gc": gc_peak_dist,
+        "index.dist.gc": gc_index_dist,
+        "sr.at": at_sr,
+        "sa.at": at_sa,
+        "peak.dist.at": at_peak_dist,
+        "index.dist.at": at_index_dist,
+    }
 # ---------- Optional CLI ----------
 
 if __name__ == "__main__":
@@ -934,6 +947,7 @@ if __name__ == "__main__":
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
+    p.add_argument("--cpus", type=int,default=min(4, os.cpu_count() or 1), help="Number of CPU cores to use for parallel feature extraction (1=serial).")
 
     p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
     p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
@@ -980,6 +994,7 @@ if __name__ == "__main__":
         args.folder,
         num_windows=args.num_windows,
         add_interaction_terms=not args.no_interactions,
+        cpus=args.cpus,
     )
 
     if args.images:
