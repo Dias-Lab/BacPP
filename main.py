@@ -597,7 +597,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
             text=new_ids if annotate_new else None,
             textposition="top center",
             hovertemplate=("New sample<br>"
-                           f"{id_col}: %{text}<br>"
+                           f"{id_col}: %{{text}}<br>"
                            "PC1: %{x:.3f}<br>PC2: %{y:.3f}<br>PC3: %{z:.3f}<extra></extra>")
         )
     )
@@ -620,7 +620,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_html = IMAGE_DIR / f"{base_name}.html"
+    out_html = IMAGES_DIR / f"{base_name}.html"
     # Write a standalone HTML you can open in any browser (no internet required)
     pio.write_html(fig, file=str(out_html), full_html=True, include_plotlyjs="cdn")
     print(f"[OK] Saved interactive 3D PCA plot → {out_html}")
