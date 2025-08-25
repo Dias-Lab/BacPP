@@ -13,10 +13,6 @@ from matplotlib.lines import Line2D
 import plotly.graph_objects as go
 import plotly.io as pio
 
-# Base outputs folder
-OUTPUTS_DIR = Path.cwd() / "outputs"
-IMAGES_DIR = OUTPUTS_DIR / "images"
-
 # Create them if missing
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -620,7 +616,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_html = IMAGES_DIR / f"{base_name}.html"
+    out_html = Path(out_dir) / f"{base_name}.html"
     # Write a standalone HTML you can open in any browser (no internet required)
     pio.write_html(fig, file=str(out_html), full_html=True, include_plotlyjs="cdn")
     print(f"[OK] Saved interactive 3D PCA plot → {out_html}")
@@ -966,10 +962,21 @@ if __name__ == "__main__":
                         "Default: <features_csv_dir>/predictions.csv")
 
     args = p.parse_args()
-
+    
     # --- Normalize paths (accept with/without trailing slash) ---
     args.folder = str(Path(args.folder).resolve())
     args.out    = str(Path(args.out).resolve())
+
+    # Set outputs to be under the input folder instead of main.py directory
+    OUTPUTS_DIR = Path(args.folder) / "outputs"
+    IMAGES_DIR = OUTPUTS_DIR / "images"
+
+    # Create directories if missing
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"[OK] Outputs → {OUTPUTS_DIR}")
+    print(f"[OK] Images  → {IMAGES_DIR}")
 
     # Optional: normalize any optional paths if provided
     if args.pred_input is not None:
@@ -1034,7 +1041,7 @@ if __name__ == "__main__":
         if args.model_path:
             knnpc_path = Path(args.model_path)
     
-        image_dir = out_dir / "image"
+        image_dir = IMAGES_DIR
         image_dir.mkdir(parents=True, exist_ok=True)
     
         if knnpc_path.exists():
