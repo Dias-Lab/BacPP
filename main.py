@@ -278,7 +278,7 @@ def run_folder(
         # Preserve input order by using ex.map with itertools.repeat
         with ProcessPoolExecutor(max_workers=cpus) as ex:
             rows = list(ex.map(_compute_features_for_file, files, repeat(num_windows), chunksize=1))
-)
+
     df = pd.DataFrame(rows)
     if add_interaction_terms and not df.empty:
         df = add_interactions(df)
