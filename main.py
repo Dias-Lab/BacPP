@@ -581,14 +581,16 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
             x=X_pc_new[:, 0],
             y=X_pc_new[:, 1],
             z=X_pc_new[:, 2],
-            mode="markers+text" if annotate_new else "markers",
+            mode="markers+text" if annotate_new else "markers",  # labels on plot only if annotate_new
             name="New samples",
             marker=dict(size=point_size_new, color="gray", opacity=0.95),
-            text=new_ids if annotate_new else None,
-            textposition="top center",
-            hovertemplate=("New sample<br>"
-                           f"{id_col}: %{{text}}<br>"
-                           "PC1: %{x:.3f}<br>PC2: %{y:.3f}<br>PC3: %{z:.3f}<extra></extra>")
+            text=new_ids,  # <-- always set for hover
+            textposition="top center" if annotate_new else None,
+            hovertemplate=(
+                "New sample<br>"
+                f"{id_col}: %{{text}}<br>"
+                "PC1: %{x:.3f}<br>PC2: %{y:.3f}<br>PC3: %{z:.3f}<extra></extra>"
+            ),
         )
     )
 
