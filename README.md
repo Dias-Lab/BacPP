@@ -24,6 +24,7 @@ Ensure you have following packages:
 git clone https://github.com/Dias-Lab/BacterialPloidyPredictor-v1.git
 conda env create -n bpp -f bpp.yml
 conda activate bpp
+./bpp -h
 ```
 
 ### Option 2: through pip install
