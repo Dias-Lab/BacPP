@@ -1,0 +1,11 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Poetry / build outputs
+dist/
+build/
+*.egg-info/
+
+# Generated outputs
+example/outputs/
