@@ -946,7 +946,7 @@ def _run_checkm2_multi(input_dir: Path, threads: int) -> list[Path]:
     Results are written under: input_dir / 'checkm2-result' / <ext> /
     Returns a list of result directories that were produced.
     """
-    result_root = input_dir / "checkm2-result"
+    result_root = outputs_dir / "checkm2-result"
     result_root.mkdir(parents=True, exist_ok=True)
 
     exts = ["fasta", "fa", "fna"]
@@ -1160,8 +1160,9 @@ if __name__ == "__main__":
         # ---- optional CheckM2 (run after predictions so we can merge into predictions.csv) ----
     if getattr(args, "checkm2", False):
         input_dir = Path(args.folder)
+        outputs_dir = Path(args.out)
         # Run once per extension present (fasta/fa/fna)
-        result_dirs = _run_checkm2_multi(input_dir=input_dir, threads=args.cpus)
+        result_dirs = _run_checkm2_multi(input_dir=input_dir, threads=args.cpus, outputs_dir=outputs_dir)
 
         # Load and merge into predictions.csv
         pred_csv_path = Path(pred_out)  # this was defined just above
