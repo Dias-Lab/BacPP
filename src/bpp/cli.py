@@ -1070,27 +1070,21 @@ def main():
     global OUTPUTS_DIR, IMAGES_DIR
 
     p = argparse.ArgumentParser(
-        description="Compute GC-skew and AT-skew FFT features for FASTA files."
+        description="BPP: Bactererial Ploidy Predictor to identify bacteiral polyploidy based on global genomic architecture."
     )
-    p.add_argument("folder", type=str, help="Folder containing FASTA/FA/FNA files")
-    p.add_argument("--num-windows", type=int, default=4096, help="Number of windows (default: 4096)")
-    p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
+    p.add_argument("folder", type=str, help="Input folder containing FASTA/FA/FNA files")
+    p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
-    p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
-    p.add_argument("--cpus", type=int, default=min(4, os.cpu_count() or 1),
-                   help="Number of CPU cores to use for parallel feature extraction (1=serial).")
-    p.add_argument("--checkm2", action="store_true",
-                   help="Run CheckM2 and append completeness/contamination to predictions.csv.")
-    p.add_argument("--predict", action="store_true",
-                   help="After feature extraction, run polyploidy prediction using a trained model.")
-    p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"],
-                   help="Model to use for prediction if --predict is set. Default: knn")
-    p.add_argument("--model-path", default=None,
-                   help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
-    p.add_argument("--id-col", default="file",
-                   help="ID column name in the features CSV for prediction. Default: file")
-    p.add_argument("--pred-input", default=None,
-                   help="Optional: features CSV to use for prediction (overrides --out).")
+    p.add_argument("--cpus", type=int, default=min(4, os.cpu_count() or 1), help="Number of CPU cores (1=serial).")
+    p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into <output folder>/image")
+    p.add_argument("--checkm2", action="store_true", help="Run CheckM2 and append completeness/contamination to predictions.csv.")
+    p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
+    p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
+    p.add_argument("--num-windows", type=int, default=4096, help="Number of windows for extracting global genomic architecture (default: 4096)")
+    p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
+    p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
+    p.add_argument("--id-col", default="file", help="ID column name in the features CSV for prediction. Default: file")
+    p.add_argument("--pred-input", default=None, help="Optional: features CSV to use for prediction (overrides --out).")
     p.add_argument("--pred-output", default=None,
                    help="Optional: predictions CSV path (2 columns: ID, polyploidy_pred). "
                         "Default: <features_csv_dir>/predictions.csv")
