@@ -115,7 +115,7 @@ CheckM2 only accept one fasta suffix among `fasta`, `fa`, and `fna`. However, yo
 
 By default, the whole chromosome is split into 4096 windows for calculattion of oligonucleotide skew values. The models are all trained based on this setting. We did not observe significant predictive power change through fine-tuning number of windows. There are three models available for polyploidy prediction: `logistic regression`, `XGBoost`, and `kNN`. By default, `kNN` was deployed due to the best performance and no signs of overfitting.
 
-As mentioned above, installation of CheckM2 is recommended nevertheless BPP is fully functional without CheckM2. We simulatd partial genome assemblies ranging from 10% to 98% to assess the predictive power of BPP (See below). According to our result, genome assemblies below 88% completeness would result in significant shift in feature values extracted for subsequent prediction, which could cause a less precise prediction using BPP. Usually the verified complete genome assemblies are recommended for most accurate prediction. 
+As mentioned above, installation of CheckM2 is recommended nevertheless BPP is fully functional without CheckM2. We simulatd partial genome assemblies ranging from 10% to 98% to assess the predictive power of BPP (See below) and see the Euclidean distance change compared to the coordinate generated uding complete genome assemblies on 3D PCA space. According to our result, genome assemblies/scaffold below 88% completeness would result in significant shift in feature values extracted for subsequent prediction, which could cause a false prediction using BPP. Usually the verified complete genome assemblies are recommended for most accurate prediction. 
 
 <img src="paper/figures/simulated-genome-shift.png">
 
