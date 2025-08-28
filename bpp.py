@@ -1123,17 +1123,17 @@ if __name__ == "__main__":
     )
 
     if args.images:
-    fasta_files = [
-        str(p)
-        for pat in ("*.fasta", "*.fa", "*.fna")
-        for p in Path(args.folder).glob(pat)
-    ]
-    img_dir = batch_visualize(
-        fasta_files=fasta_files,
-        out_root=Path(args.folder),
-        num_windows=args.num_windows
-    )
-    print(f"Saved images to {img_dir}")
+        fasta_files = [
+            str(p)
+            for pat in ("*.fasta", "*.fa", "*.fna")
+            for p in Path(args.folder).glob(pat)
+        ]
+        img_dir = batch_visualize(
+            fasta_files=fasta_files,
+            out_root=Path(args.folder),
+            num_windows=args.num_windows
+        )
+        print(f"Saved images to {img_dir}")
 
     # Ensure output directory exists
     out_dir = Path(args.out)
