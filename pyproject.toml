@@ -5,14 +5,13 @@ description = "Bacterial polyploidy predictor: GC/AT skew features + kNN/LogReg/
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
 readme = "README.md"
-packages = [{ include = "bpp" }]
+packages = [{ include = "bpp", from = "src" }]
 
 include = [
-  { path = "bpp/models/*.json", format = "wheel" },
-  { path = "bpp/models/*.json", format = "sdist" },
-  { path = "example/*", format = "sdist" },
-  { path = "paper/*",   format = "sdist" },
-  { path = "bpp.yml",   format = "sdist" }
+  "src/bpp/models/*.json",  # Always package models
+  "bpp.yml",                # Conda environment file
+  "example/*",              # Include example data
+  "paper/*"                 # Include manuscript figures/data
 ]
 
 [tool.poetry.dependencies]
@@ -21,7 +20,8 @@ numpy = "^1.24"
 pandas = "^2.0"
 matplotlib = "^3.8"
 plotly = "^6.0"
-xgboost = version = "^2.0"
+xgboost = "^2.0"
+scikit-learn = "^1.5"
 
 [tool.poetry.scripts]
 bpp = "bpp.cli:main"

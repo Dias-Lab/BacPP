@@ -1062,47 +1062,60 @@ def _merge_checkm2_into_predictions(pred_csv: Path, checkm2_dir: Path):
     merged.to_csv(pred_csv, index=False)
     print(f"[checkm2] Appended completeness & contamination → {pred_csv}")
 
-# ---------- Optional CLI ----------
+# ---------- CLI ----------
+OUTPUTS_DIR = None
+IMAGES_DIR = None
 
-if __name__ == "__main__":
+def main():
+    global OUTPUTS_DIR, IMAGES_DIR
 
-    p = argparse.ArgumentParser(description="Compute GC-skew and AT-skew FFT features for FASTA files.")
+    p = argparse.ArgumentParser(
+        description="Compute GC-skew and AT-skew FFT features for FASTA files."
+    )
     p.add_argument("folder", type=str, help="Folder containing FASTA/FA/FNA files")
     p.add_argument("--num-windows", type=int, default=4096, help="Number of windows (default: 4096)")
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
-    p.add_argument("--cpus", type=int,default=min(4, os.cpu_count() or 1), help="Number of CPU cores to use for parallel feature extraction (1=serial).")
-    p.add_argument("--checkm2", action="store_true", help="Run CheckM2 and append completeness/contamination to predictions.csv.")
-    p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
-    p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
-    p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
-    p.add_argument("--id-col", default="file", help="ID column name in the features CSV for prediction. Default: file")
-    p.add_argument("--pred-input", default=None, help="Optional: features CSV to use for prediction (overrides --out).")
-    p.add_argument("--pred-output", default=None, help="Optional: predictions CSV path (2 columns: ID, polyploidy_pred). "
+    p.add_argument("--cpus", type=int, default=min(4, os.cpu_count() or 1),
+                   help="Number of CPU cores to use for parallel feature extraction (1=serial).")
+    p.add_argument("--checkm2", action="store_true",
+                   help="Run CheckM2 and append completeness/contamination to predictions.csv.")
+    p.add_argument("--predict", action="store_true",
+                   help="After feature extraction, run polyploidy prediction using a trained model.")
+    p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"],
+                   help="Model to use for prediction if --predict is set. Default: knn")
+    p.add_argument("--model-path", default=None,
+                   help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
+    p.add_argument("--id-col", default="file",
+                   help="ID column name in the features CSV for prediction. Default: file")
+    p.add_argument("--pred-input", default=None,
+                   help="Optional: features CSV to use for prediction (overrides --out).")
+    p.add_argument("--pred-output", default=None,
+                   help="Optional: predictions CSV path (2 columns: ID, polyploidy_pred). "
                         "Default: <features_csv_dir>/predictions.csv")
 
     args = p.parse_args()
-    
+
     # --- Normalize paths (accept with/without trailing slash) ---
     args.folder = str(Path(args.folder).resolve())
-    
-   # --- If user didn't provide --out, set it to <folder>/outputs ---
+
+    # --- If user didn't provide --out, set it to <folder>/outputs ---
     if args.out is None:
         OUTPUTS_DIR = Path(args.folder) / "outputs"
     else:
         OUTPUTS_DIR = Path(args.out).resolve()
-    
+
     # Set args.out to the resolved path for downstream consistency
     args.out = str(OUTPUTS_DIR)
-    
+
     # Always define IMAGES_DIR under the chosen OUTPUTS_DIR
     IMAGES_DIR = OUTPUTS_DIR / "images"
-    
+
     # Create directories
     OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     print(f"[OK] Outputs → {OUTPUTS_DIR}")
     print(f"[OK] Images  → {IMAGES_DIR}")
 
@@ -1163,15 +1176,19 @@ if __name__ == "__main__":
         print(f"Prediction written to {pred_out}")
         pred_csv_path = Path(pred_out)
 
-        # ---- optional CheckM2 (run after predictions so we can merge into predictions.csv) ----
+    # ---- optional CheckM2 (after predictions so we can merge into predictions.csv) ----
     if getattr(args, "checkm2", False):
+        if pred_csv_path is None:
+            print("[checkm2] ERROR: No predictions file to annotate. Run with --predict (or supply --pred-output).")
+            sys.exit(1)
+
         input_dir = Path(args.folder)
         outputs_dir = Path(args.out)
+
         # Run once per extension present (fasta/fa/fna)
         result_dirs = _run_checkm2_multi(input_dir=input_dir, threads=args.cpus, outputs_dir=outputs_dir)
 
         # Load and merge into predictions.csv
-        pred_csv_path = Path(pred_out)  # this was defined just above
         try:
             pred_df = pd.read_csv(pred_csv_path)
         except Exception as e:
@@ -1186,7 +1203,7 @@ if __name__ == "__main__":
             merged = pred_df.merge(chk_df, on="file", how="left")
             merged.to_csv(pred_csv_path, index=False)
             print(f"[checkm2] Appended completeness/contamination → {pred_csv_path}")
-    
+
     # ---- Generate multi-view 3D PCA plots when kNNPC.json is the active model ----
     using_knnpc = (args.model.lower() == "knn")
     if args.model_path:
@@ -1194,15 +1211,15 @@ if __name__ == "__main__":
 
     if using_knnpc:
         feats_csv = args.pred_input if args.pred_input else str(Path(args.out) / "extracted_features.csv")
-    
+
         MODELS_DIR = Path(__file__).resolve().parent / "models"
         knnpc_path = MODELS_DIR / "kNNPC.json"
         if args.model_path:
             knnpc_path = Path(args.model_path)
-    
+
         image_dir = IMAGES_DIR
         image_dir.mkdir(parents=True, exist_ok=True)
-    
+
         if knnpc_path.exists():
             try:
                 # NEW: interactive Plotly 3D PCA (HTML)
@@ -1216,7 +1233,7 @@ if __name__ == "__main__":
                     point_size_new=5,
                     annotate_new=False
                 )
-    
+
                 # Keep your distance histogram (matplotlib PNG)
                 plot_within_group_distance_hist(
                     input_csv=feats_csv,
@@ -1230,3 +1247,6 @@ if __name__ == "__main__":
                 pass
         else:
             print(f"[info] kNNPC model file not found for 3D plots: {knnpc_path}")
+
+if __name__ == "__main__":
+    main()
