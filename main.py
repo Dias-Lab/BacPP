@@ -940,43 +940,45 @@ def _compute_features_for_file(fp: Path, num_windows: int) -> dict:
     }
 
 # ---------- OPTIONAL: estimate genome assembly and contamination using CheckM2 ---------- #
-def _run_checkm2(input_dir: Path, threads: int) -> Path:
+def _run_checkm2(input_dir: Path, threads: int):
     """
-    Run CheckM2 on fasta/fa/fna found in input_dir.
-    Writes results to <input_dir>/checkm2-result and returns that path.
+    Run CheckM2 predict on input_dir automatically detecting correct extension.
+    Uses the first available extension among fasta/fa/fna.
+    Runs only once to avoid overwriting the output directory.
     """
-    out_dir = input_dir / "checkm2-result"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    checkm2_dir = input_dir / "checkm2-result"
+    checkm2_dir.mkdir(parents=True, exist_ok=True)
 
-    # Only run for extensions that actually exist to avoid empty jobs
-    exts = ["fasta", "fa", "fna"]
-    present_exts = []
-    for ext in exts:
-        if any(input_dir.glob(f"*.{ext}")):
-            present_exts.append(ext)
+    # Detect supported extensions automatically
+    extensions = ["fasta", "fa", "fna"]
+    available_exts = []
+    for ext in extensions:
+        if list(input_dir.glob(f"*.{ext}")):
+            available_exts.append(ext)
 
-    if not present_exts:
-        print("[checkm2] No *.fasta/*.fa/*.fna files found to run CheckM2 on.")
-        return out_dir
+    if not available_exts:
+        print(f"[checkm2] WARNING: No FASTA/FA/FNA files found under {input_dir}. Skipping CheckM2.")
+        return checkm2_dir
 
-    for ext in present_exts:
-        cmd = (
-            f"checkm2 predict "
-            f"--threads {int(max(1, threads))} "
-            f"-x {shlex.quote(ext)} "
-            f"--input {shlex.quote(str(input_dir))} "
-            f"--output-directory {shlex.quote(str(out_dir))}"
-        )
-        print(f"[checkm2] Running: {cmd}")
-        # Note: if you want to see live output, remove capture_output=True
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        if res.returncode != 0:
-            print("[checkm2] ERROR running command:")
-            print(res.stdout)
-            print(res.stderr, file=sys.stderr)
-            _err(f"CheckM2 failed for -x {ext} (see messages above).")
-    return out_dir
+    # Always pick the first matching extension (CheckM2 only supports one per run)
+    chosen_ext = available_exts[0]
+    cmd = (
+        f"checkm2 predict --threads {threads} "
+        f"-x {chosen_ext} "
+        f"--input {shlex.quote(str(input_dir))} "
+        f"--output-directory {shlex.quote(str(checkm2_dir))} --force"
+    )
+    print(f"[checkm2] Running: {cmd}")
 
+    try:
+        subprocess.run(shlex.split(cmd), check=True)
+        print(f"[checkm2] Finished successfully → {checkm2_dir}")
+    except subprocess.CalledProcessError as e:
+        print(f"[checkm2] ERROR: CheckM2 failed. Command:\n{cmd}\n{e}")
+        sys.exit(1)
+
+    return checkm2_dir
+    
 def _load_checkm2_summary(out_dir: Path) -> pd.DataFrame:
     """
     Try to find and read a CheckM2 summary table from out_dir.
