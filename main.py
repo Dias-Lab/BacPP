@@ -940,102 +940,103 @@ def _compute_features_for_file(fp: Path, num_windows: int) -> dict:
     }
 
 # ---------- OPTIONAL: estimate genome assembly and contamination using CheckM2 ---------- #
-def _run_checkm2(input_dir: Path, threads: int):
+def _run_checkm2_multi(input_dir: Path, threads: int) -> list[Path]:
     """
-    Run CheckM2 predict on input_dir automatically detecting correct extension.
-    Uses the first available extension among fasta/fa/fna.
-    Runs only once to avoid overwriting the output directory.
+    Run CheckM2 once per detected extension among {fasta, fa, fna}.
+    Results are written under: input_dir / 'checkm2-result' / <ext> /
+    Returns a list of result directories that were produced.
     """
-    checkm2_dir = input_dir / "checkm2-result"
-    checkm2_dir.mkdir(parents=True, exist_ok=True)
+    result_root = input_dir / "checkm2-result"
+    result_root.mkdir(parents=True, exist_ok=True)
 
-    # Detect supported extensions automatically
-    extensions = ["fasta", "fa", "fna"]
-    available_exts = []
-    for ext in extensions:
-        if list(input_dir.glob(f"*.{ext}")):
-            available_exts.append(ext)
+    exts = ["fasta", "fa", "fna"]
+    produced = []
 
-    if not available_exts:
-        print(f"[checkm2] WARNING: No FASTA/FA/FNA files found under {input_dir}. Skipping CheckM2.")
-        return checkm2_dir
+    for ext in exts:
+        if not list(input_dir.glob(f"*.{ext}")):
+            continue
+        out_dir = result_root / ext
+        out_dir.mkdir(parents=True, exist_ok=True)
+        cmd = (
+            f"checkm2 predict --threads {threads} "
+            f"-x {ext} "
+            f"--input {shlex.quote(str(input_dir))} "
+            f"--output-directory {shlex.quote(str(out_dir))} --force"
+        )
+        print(f"[checkm2] Running: {cmd}")
+        try:
+            subprocess.run(shlex.split(cmd), check=True)
+            produced.append(out_dir)
+        except subprocess.CalledProcessError as e:
+            print(f"[checkm2] ERROR: CheckM2 failed for -x {ext}. Command:\n{cmd}\n{e}")
+            sys.exit(1)
 
-    # Always pick the first matching extension (CheckM2 only supports one per run)
-    chosen_ext = available_exts[0]
-    cmd = (
-        f"checkm2 predict --threads {threads} "
-        f"-x {chosen_ext} "
-        f"--input {shlex.quote(str(input_dir))} "
-        f"--output-directory {shlex.quote(str(checkm2_dir))} --force"
-    )
-    print(f"[checkm2] Running: {cmd}")
+    if not produced:
+        print(f"[checkm2] WARNING: No *.fasta/*.fa/*.fna files found in {input_dir}. Skipping CheckM2.")
+    else:
+        print(f"[checkm2] Finished. Reports under: {result_root}")
 
-    try:
-        subprocess.run(shlex.split(cmd), check=True)
-        print(f"[checkm2] Finished successfully → {checkm2_dir}")
-    except subprocess.CalledProcessError as e:
-        print(f"[checkm2] ERROR: CheckM2 failed. Command:\n{cmd}\n{e}")
-        sys.exit(1)
+    return produced
 
-    return checkm2_dir
-    
-def _load_checkm2_summary(out_dir: Path) -> pd.DataFrame:
+
+def _load_checkm2_results_multi(result_dirs: list[Path]) -> pd.DataFrame:
     """
-    Try to find and read a CheckM2 summary table from out_dir.
-    Returns a DataFrame with columns: ['stem', 'completeness', 'contamination'].
+    Read all quality_report.tsv files from result_dirs and return a DataFrame:
+      columns: ['file','completeness','contamination']
+    We try to be robust to column naming in CheckM2 outputs and to whether 'Name'
+    includes an extension or not. If no extension is present, we emit three
+    candidates: name.fasta, name.fa, name.fna (the merge will pick the right one).
     """
-    # Common file names (but be permissive)
-    candidates = []
-    for pat in ["**/*quality*.tsv", "**/*quality*.csv", "**/*.tsv", "**/*.csv"]:
-        candidates.extend(out_dir.glob(pat))
-    if not candidates:
-        _err(f"No CheckM2 summary (.tsv/.csv) found in {out_dir}")
+    frames = []
+    for d in result_dirs:
+        tsv = d / "quality_report.tsv"
+        if not tsv.exists():
+            # Some CheckM2 builds use a different file name; add fallbacks if needed
+            # e.g., "quality_report.txt"
+            alt = d / "quality_report.txt"
+            if alt.exists():
+                tsv = alt
+            else:
+                print(f"[checkm2] WARNING: Missing quality report in {d}")
+                continue
 
-    # Prefer files with 'quality' in the name; else pick the largest
-    quality_first = [p for p in candidates if "quality" in p.name.lower()]
-    files = quality_first if quality_first else candidates
-    # Pick the largest by size as a fallback for multi-file outputs
-    target = max(files, key=lambda p: p.stat().st_size)
+        df = pd.read_csv(tsv, sep="\t")
 
-    try:
-        df = pd.read_csv(target, sep=None, engine="python")
-    except Exception as e:
-        _err(f"Failed to read CheckM2 table {target}: {e}")
+        # Try to find the identifier + metrics columns regardless of capitalization
+        name_col = next((c for c in ["Name", "Bin Id", "Bin", "Genome", "ID", "Sample Id"] if c in df.columns), None)
+        comp_col = next((c for c in ["Completeness", "completeness", "CheckM2 completeness", "CheckM2_completeness"] if c in df.columns), None)
+        cont_col = next((c for c in ["Contamination", "contamination", "CheckM2 contamination", "CheckM2_contamination"] if c in df.columns), None)
 
-    # Normalize column names
-    lower_map = {c: c.lower() for c in df.columns}
-    df.rename(columns=lower_map, inplace=True)
+        if name_col is None or comp_col is None or cont_col is None:
+            print(f"[checkm2] WARNING: Could not locate expected columns in {tsv}. Found: {list(df.columns)}")
+            continue
 
-    # Heuristic for id / completeness / contamination columns
-    id_cols = [c for c in df.columns if c in ("genome", "name", "bin id", "bin_id", "sample", "filename")]
-    comp_cols = [c for c in df.columns if "completeness" in c]
-    cont_cols = [c for c in df.columns if "contamination" in c]
+        sub = df[[name_col, comp_col, cont_col]].copy()
+        sub.columns = ["name", "completeness", "contamination"]
 
-    if not id_cols or not comp_cols or not cont_cols:
-        _err(f"Could not identify id/completeness/contamination columns in {target}. "
-             f"Columns present: {list(df.columns)}")
+        records = []
+        for _, r in sub.iterrows():
+            name = str(r["name"])
+            comp = r["completeness"]
+            cont = r["contamination"]
 
-    id_col = id_cols[0]
-    comp_col = comp_cols[0]
-    cont_col = cont_cols[0]
+            # If the name already has an extension, use as-is
+            if any(name.endswith(f".{e}") for e in ["fasta", "fa", "fna"]):
+                records.append({"file": name, "completeness": comp, "contamination": cont})
+            else:
+                # Emit candidates with each extension; the merge will keep matches only
+                for e in ["fasta", "fa", "fna"]:
+                    records.append({"file": f"{name}.{e}", "completeness": comp, "contamination": cont})
 
-    # Build 'stem' to match your 'file' column (basename without extension)
-    def _to_stem(x):
-        x = str(x)
-        base = Path(x).name
-        # If CheckM2 kept extensions, drop them
-        for ext in (".fasta", ".fa", ".fna", ".faa", ".fas"):
-            if base.lower().endswith(ext):
-                return Path(base).stem
-        return Path(base).stem
+        if records:
+            frames.append(pd.DataFrame.from_records(records))
 
-    out = pd.DataFrame({
-        "stem": df[id_col].map(_to_stem),
-        "completeness": pd.to_numeric(df[comp_col], errors="coerce"),
-        "contamination": pd.to_numeric(df[cont_col], errors="coerce"),
-    })
-    # Drop duplicates keeping the first (or you can groupby('stem').max())
-    out = out.dropna(subset=["stem"]).drop_duplicates(subset=["stem"])
+    if not frames:
+        return pd.DataFrame(columns=["file", "completeness", "contamination"])
+
+    out = pd.concat(frames, ignore_index=True)
+    # If duplicates exist (e.g., both name.fasta and name.fa appeared), keep the first
+    out = out.drop_duplicates(subset=["file"])
     return out
 
 def _merge_checkm2_into_predictions(pred_csv: Path, checkm2_dir: Path):
@@ -1156,24 +1157,29 @@ if __name__ == "__main__":
         print(f"Prediction written to {pred_out}")
         pred_csv_path = Path(pred_out)
 
-    # ---- optional CheckM2 integration ----
-    if args.checkm2:
+        # ---- optional CheckM2 (run after predictions so we can merge into predictions.csv) ----
+    if getattr(args, "checkm2", False):
         input_dir = Path(args.folder)
-        checkm2_dir = _run_checkm2(input_dir=input_dir, threads=args.cpus)
+        # Run once per extension present (fasta/fa/fna)
+        result_dirs = _run_checkm2_multi(input_dir=input_dir, threads=args.cpus)
 
-        # If we have predictions, append completeness/contamination into the same CSV
-        if pred_csv_path and pred_csv_path.exists():
-            _merge_checkm2_into_predictions(pred_csv=pred_csv_path, checkm2_dir=checkm2_dir)
+        # Load and merge into predictions.csv
+        pred_csv_path = Path(pred_out)  # this was defined just above
+        try:
+            pred_df = pd.read_csv(pred_csv_path)
+        except Exception as e:
+            print(f"[checkm2] ERROR: Could not read predictions at {pred_csv_path}: {e}")
+            sys.exit(1)
+
+        chk_df = _load_checkm2_results_multi(result_dirs)
+
+        if chk_df.empty:
+            print("[checkm2] WARNING: No completeness/contamination parsed; predictions.csv left unchanged.")
         else:
-            # No predictions requested — still run CheckM2, and drop a separate summary into OUTPUTS_DIR
-            try:
-                qc = _load_checkm2_summary(checkm2_dir)
-                qc_out = OUTPUTS_DIR / "checkm2_summary.csv"
-                qc.to_csv(qc_out, index=False)
-                print(f"[checkm2] Wrote summary → {qc_out}")
-            except SystemExit:
-                # _load_checkm2_summary already printed the error
-                pass
+            merged = pred_df.merge(chk_df, on="file", how="left")
+            merged.to_csv(pred_csv_path, index=False)
+            print(f"[checkm2] Appended completeness/contamination → {pred_csv_path}")
+    
     # ---- Generate multi-view 3D PCA plots when kNNPC.json is the active model ----
     using_knnpc = (args.model.lower() == "knn")
     if args.model_path:
