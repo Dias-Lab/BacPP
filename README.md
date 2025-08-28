@@ -90,6 +90,7 @@ options:
 ### Quick start
 
 To serve as the test run of this tool, the following command can be copied directly and executed at package root directory to perform polyploidy prediction, visualizing global genomic architectures and prediction confidence-related statistics (PCA as an overview and quantile of pairwise Euclidean distance among in-group and between-group pairwise Euclidean distance distribution), as well as prediction result of CheckM2:
+
 ```bash
 bpp ./example --images --predict --cpus 4 --checkm2
 ```
@@ -109,6 +110,14 @@ or:
 ## Note
 
 If no output directory is given, bpp will automatically generate a new subdirectory under the input directory named `outputs`, where `prediction.csv` as the main prediction result as well as the extracted feasures `extracted_features.csv` are included. One or two subdirectories `checkm2-result` (optional) and `images` will be generated to store raw output of CheckM2, and the exported `png` and interactive 3-dimensional PCA plot in `html` format.
+
+CheckM2 only accept one fasta suffix among `fasta`, `fa`, and `fna`. However, you don't have to worry about renaming the input fasta files. All fasta files with either `fasta`, `fa`, or `fna` suffix can be dumped into one single input directory. BPP will read all fasta files and make prediction and plot using all recognized fasta files.
+
+By default, the whole chromosome is split into 4096 windows for calculattion of oligonucleotide skew values. The models are all trained based on this setting. We did not observe significant predictive power change through fine-tuning number of windows. There are three models available for polyploidy prediction: `logistic regression`, `XGBoost`, and `kNN`. By default, `kNN` was deployed due to the best performance and no signs of overfitting.
+
+As mentioned above, installation of CheckM2 is recommended nevertheless BPP is fully functional without CheckM2. We simulatd partial genome assemblies ranging from 10% to 98% to assess the predictive power of BPP (See below). According to our result, genome assemblies below 88% completeness would result in significant shift in feature values extracted for subsequent prediction, which could cause a less precise prediction using BPP. Usually the verified complete genome assemblies are recommended for most accurate prediction. 
+
+<img src="paper/figures/simulated-genome-shift.png">
 
 ## Outputs
 <img src="paper/figures/example_outputs.png">
