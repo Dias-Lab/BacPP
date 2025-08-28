@@ -940,10 +940,10 @@ def _compute_features_for_file(fp: Path, num_windows: int) -> dict:
     }
 
 # ---------- OPTIONAL: estimate genome assembly and contamination using CheckM2 ---------- #
-def _run_checkm2_multi(input_dir: Path, threads: int) -> list[Path]:
+def _run_checkm2_multi(input_dir: Path, threads: int, outputs_dir: Path) -> list[Path]:
     """
     Run CheckM2 once per detected extension among {fasta, fa, fna}.
-    Results are written under: input_dir / 'checkm2-result' / <ext> /
+    Results are written under: output_dir / 'checkm2-result' / <ext> /
     Returns a list of result directories that were produced.
     """
     result_root = outputs_dir / "checkm2-result"
