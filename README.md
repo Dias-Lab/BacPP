@@ -30,10 +30,9 @@ conda activate bpp
 ### Option 2: through pip install
 
 ```bash
-pip install 
+pip install bpp
+bpp -h
 ```
-
-
 
 ---
 
@@ -51,12 +50,13 @@ pip install
 
 ## Usage
 
-If installed via `pip`, use bpp `...`; if installed via `git clone`, use `bpp.py ...`
+If installed via `pip`, use `bpp ...`; if installed via `git clone`, use `bpp.py ...`
 
 To pull out the instruction page for full list of arguments, 
 ```bash
 bpp -h
 ```
+
 ```bash
 usage: bpp [-h] [--predict] [--out OUT] [--cpus CPUS] [--images] [--checkm2] [--model {knn,lg,xgb}] [--model-path MODEL_PATH] [--num-windows NUM_WINDOWS]
            [--no-interactions] [--id-col ID_COL] [--pred-input PRED_INPUT] [--pred-output PRED_OUTPUT]
@@ -86,9 +86,29 @@ options:
   --pred-output PRED_OUTPUT
                         Optional: predictions CSV path (2 columns: ID, polyploidy_pred). Default: <features_csv_dir>/predictions.csv
 ```
+
+### Quick start
+
+To serve as the test run of this tool, the following command can be copied directly and executed at package root directory to perform polyploidy prediction, visualizing global genomic architectures and prediction confidence-related statistics (PCA as an overview and quantile of pairwise Euclidean distance among in-group and between-group pairwise Euclidean distance distribution), as well as prediction result of CheckM2:
+```bash
+bpp ./example --images --predict --cpus 4 --checkm2
+```
+or:
+```bash
+./bpp.py ./example --images --predict --cpus 4 --checkm2
+```
+If CheckM2 is not installed, please run:
+```bash
+bpp ./example --images --predict --cpus 4
+```
+or:
+```bash
+./bpp.py ./example --images --predict --cpus 4
+```
+
 ## Note
 
-
+If no output directory is given, bpp will automatically generate a new subdirectory under the input directory named `outputs`, where `prediction.csv` as the main prediction result as well as the extracted feasures `extracted_features.csv` are included. One or two subdirectories `checkm2-result` (optional) and `images` will be generated to store raw output of CheckM2, and the exported `png` and interactive 3-dimensional PCA plot in `html` format.
 
 ## Outputs
 <img src="paper/figures/example_outputs.png">
@@ -96,9 +116,9 @@ Above is the illustration from a selection of outputs from examples using genome
 
 | file | polyploidy_pred | PED.confidence | completeness | contamination |
 | :-------: | :------: | :-------: | :-------: |  :-------: |  
-| Citrobacter_freundii_ATCC_8090.fasta | 1 | '0.9767195925928703 | | |
-| Escherichia_coli.fna | 0.725 | 0 | 1 | | |
-| Synechocystis_sp_PCC_6803.fasta | 1 | 1 | | |
+| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 100.0| 0.08 |
+| Escherichia_coli.fna | 0.725 | 0 | 1 | 100.0 | 0.01 |
+| Synechocystis_sp_PCC_6803.fasta | 1 | 1 | 99.99 | 0.1 |
 
-The main prediction and prediction confidence are saved in the main output file prediction.csv. Above is the example output when kNN (default) is selected as the model for prediction:
+The main prediction and prediction confidence are saved in the main output file prediction.csv. Above is the example output when kNN (default) is selected as the model for prediction.
 
