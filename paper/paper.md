@@ -62,11 +62,12 @@ To demonstarte, we ran BPP using three complete genome files from species *Esche
 (\autoref{fig:examples})![BacterialPloidyPredictor.\label{fig:examples}](figures/example_outputs.png)
 
 The main prediction and prediction confidence are saved in the main output file prediction.csv. Below is the example output when kNN (default) is selected as the model for prediction:
-| file | polyploidy_pred | PED.confidence |
-| :-------: | :------: | :-------: | 
-| Citrobacter_freundii_ATCC_8090.fasta | 1 | '0.9767195925928703 |
-| Escherichia_coli.fasta | 0.725 | 0 | 1 |
-| Synechocystis_sp_PCC_6803.fasta | 1 | 1 |
+
+| file | polyploidy_pred | PED.confidence | completeness | contamination |
+| :-------: | :------: | :-------: | :-------: |  :-------: |  
+| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 100.0| 0.08 |
+| Escherichia_coli.fna | 0.725 | 0 | 1 | 100.0 | 0.01 |
+| Synechocystis_sp_PCC_6803.fasta | 1 | 1 | 99.99 | 0.1 |
 
 # Acknowledgement
 We are grateful to members from Dr. Raquel Dias lab for testing the tool and providing constructive feedbacks that perfectionate this package.
