@@ -1082,7 +1082,6 @@ def main():
     p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
     p.add_argument("--num-windows", type=int, default=4096, help="Number of windows for extracting global genomic architecture (default: 4096)")
     p.add_argument("--no-interactions", action="store_true", help="Do not add interaction terms")
-    p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
     p.add_argument("--id-col", default="file", help="ID column name in the features CSV for prediction. Default: file")
     p.add_argument("--pred-input", default=None, help="Optional: features CSV to use for prediction (overrides --out).")
     p.add_argument("--pred-output", default=None,
