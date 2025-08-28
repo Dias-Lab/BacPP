@@ -15,7 +15,8 @@ import sys
 import plotly.graph_objects as go
 import plotly.io as pio
 import os
-#parallelization needed, incorporation of CheckM2 needed
+import subprocess
+import shlex
 
 # Fixed constants for calculating spectrum amplitute (SA) - Arakawa et al., 2009
 K3 = 600.0
@@ -937,6 +938,127 @@ def _compute_features_for_file(fp: Path, num_windows: int) -> dict:
         "peak.dist.at": at_peak_dist,
         "index.dist.at": at_index_dist,
     }
+
+# ---------- OPTIONAL: estimate genome assembly and contamination using CheckM2 ---------- #
+def _run_checkm2(input_dir: Path, threads: int) -> Path:
+    """
+    Run CheckM2 on fasta/fa/fna found in input_dir.
+    Writes results to <input_dir>/checkm2-result and returns that path.
+    """
+    out_dir = input_dir / "checkm2-result"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Only run for extensions that actually exist to avoid empty jobs
+    exts = ["fasta", "fa", "fna"]
+    present_exts = []
+    for ext in exts:
+        if any(input_dir.glob(f"*.{ext}")):
+            present_exts.append(ext)
+
+    if not present_exts:
+        print("[checkm2] No *.fasta/*.fa/*.fna files found to run CheckM2 on.")
+        return out_dir
+
+    for ext in present_exts:
+        cmd = (
+            f"checkm2 predict "
+            f"--threads {int(max(1, threads))} "
+            f"-x {shlex.quote(ext)} "
+            f"--input {shlex.quote(str(input_dir))} "
+            f"--output-directory {shlex.quote(str(out_dir))}"
+        )
+        print(f"[checkm2] Running: {cmd}")
+        # Note: if you want to see live output, remove capture_output=True
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if res.returncode != 0:
+            print("[checkm2] ERROR running command:")
+            print(res.stdout)
+            print(res.stderr, file=sys.stderr)
+            _err(f"CheckM2 failed for -x {ext} (see messages above).")
+    return out_dir
+
+def _load_checkm2_summary(out_dir: Path) -> pd.DataFrame:
+    """
+    Try to find and read a CheckM2 summary table from out_dir.
+    Returns a DataFrame with columns: ['stem', 'completeness', 'contamination'].
+    """
+    # Common file names (but be permissive)
+    candidates = []
+    for pat in ["**/*quality*.tsv", "**/*quality*.csv", "**/*.tsv", "**/*.csv"]:
+        candidates.extend(out_dir.glob(pat))
+    if not candidates:
+        _err(f"No CheckM2 summary (.tsv/.csv) found in {out_dir}")
+
+    # Prefer files with 'quality' in the name; else pick the largest
+    quality_first = [p for p in candidates if "quality" in p.name.lower()]
+    files = quality_first if quality_first else candidates
+    # Pick the largest by size as a fallback for multi-file outputs
+    target = max(files, key=lambda p: p.stat().st_size)
+
+    try:
+        df = pd.read_csv(target, sep=None, engine="python")
+    except Exception as e:
+        _err(f"Failed to read CheckM2 table {target}: {e}")
+
+    # Normalize column names
+    lower_map = {c: c.lower() for c in df.columns}
+    df.rename(columns=lower_map, inplace=True)
+
+    # Heuristic for id / completeness / contamination columns
+    id_cols = [c for c in df.columns if c in ("genome", "name", "bin id", "bin_id", "sample", "filename")]
+    comp_cols = [c for c in df.columns if "completeness" in c]
+    cont_cols = [c for c in df.columns if "contamination" in c]
+
+    if not id_cols or not comp_cols or not cont_cols:
+        _err(f"Could not identify id/completeness/contamination columns in {target}. "
+             f"Columns present: {list(df.columns)}")
+
+    id_col = id_cols[0]
+    comp_col = comp_cols[0]
+    cont_col = cont_cols[0]
+
+    # Build 'stem' to match your 'file' column (basename without extension)
+    def _to_stem(x):
+        x = str(x)
+        base = Path(x).name
+        # If CheckM2 kept extensions, drop them
+        for ext in (".fasta", ".fa", ".fna", ".faa", ".fas"):
+            if base.lower().endswith(ext):
+                return Path(base).stem
+        return Path(base).stem
+
+    out = pd.DataFrame({
+        "stem": df[id_col].map(_to_stem),
+        "completeness": pd.to_numeric(df[comp_col], errors="coerce"),
+        "contamination": pd.to_numeric(df[cont_col], errors="coerce"),
+    })
+    # Drop duplicates keeping the first (or you can groupby('stem').max())
+    out = out.dropna(subset=["stem"]).drop_duplicates(subset=["stem"])
+    return out
+
+def _merge_checkm2_into_predictions(pred_csv: Path, checkm2_dir: Path):
+    """
+    Append 'completeness' and 'contamination' to predictions.csv by matching file stems.
+    """
+    if not pred_csv.exists():
+        _err(f"predictions CSV not found: {pred_csv}")
+
+    pred = pd.read_csv(pred_csv)
+    if "file" not in pred.columns:
+        _err(f"'file' column not found in predictions CSV: {list(pred.columns)}")
+
+    pred = pred.copy()
+    pred["stem"] = pred["file"].map(lambda s: Path(str(s)).stem)
+
+    qc = _load_checkm2_summary(checkm2_dir)
+    merged = pred.merge(qc, how="left", on="stem")
+
+    # Put new columns near the end (after existing ones)
+    cols = [c for c in merged.columns if c != "stem"]
+    merged = merged[cols]
+    merged.to_csv(pred_csv, index=False)
+    print(f"[checkm2] Appended completeness & contamination → {pred_csv}")
+
 # ---------- Optional CLI ----------
 
 if __name__ == "__main__":
@@ -948,7 +1070,7 @@ if __name__ == "__main__":
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into ./image")
     p.add_argument("--cpus", type=int,default=min(4, os.cpu_count() or 1), help="Number of CPU cores to use for parallel feature extraction (1=serial).")
-
+    p.add_argument("--checkm2", action="store_true", help="Run CheckM2 and append completeness/contamination to predictions.csv.")
     p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
     p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
     p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
@@ -1014,6 +1136,7 @@ if __name__ == "__main__":
     print(f"Wrote {features_path} with {len(df)} rows")
 
     # ---- prediction ----
+    pred_csv_path = None
     if args.predict:
         features_path = Path(args.pred_input) if args.pred_input else out_dir / "extracted_features.csv"
         feats_csv = str(features_path)
@@ -1029,6 +1152,26 @@ if __name__ == "__main__":
             model_path=args.model_path,
         )
         print(f"Prediction written to {pred_out}")
+        pred_csv_path = Path(pred_out)
+
+    # ---- optional CheckM2 integration ----
+    if args.checkm2:
+        input_dir = Path(args.folder)
+        checkm2_dir = _run_checkm2(input_dir=input_dir, threads=args.cpus)
+
+        # If we have predictions, append completeness/contamination into the same CSV
+        if pred_csv_path and pred_csv_path.exists():
+            _merge_checkm2_into_predictions(pred_csv=pred_csv_path, checkm2_dir=checkm2_dir)
+        else:
+            # No predictions requested — still run CheckM2, and drop a separate summary into OUTPUTS_DIR
+            try:
+                qc = _load_checkm2_summary(checkm2_dir)
+                qc_out = OUTPUTS_DIR / "checkm2_summary.csv"
+                qc.to_csv(qc_out, index=False)
+                print(f"[checkm2] Wrote summary → {qc_out}")
+            except SystemExit:
+                # _load_checkm2_summary already printed the error
+                pass
     # ---- Generate multi-view 3D PCA plots when kNNPC.json is the active model ----
     using_knnpc = (args.model.lower() == "knn")
     if args.model_path:
