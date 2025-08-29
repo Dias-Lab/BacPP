@@ -23,8 +23,6 @@ K3 = 600.0
 K4 = 40.0
 ALPHA = 0.4
 # ---------- DATA PREPROCESSING ----------
-## ---------- Core utilities ----------
-
 def read_first_fasta_sequence(path: Path) -> str:
     """Read the first sequence from a FASTA/FA/FNA file."""
     seq_parts: List[str] = []
@@ -171,7 +169,6 @@ def atsi_features_from_atskew(
     return at_sr, at_sa, at_peak_dist, at_index_dist
 
 ## ---------- Interaction terms ----------
-
 def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     out = np.full_like(a, np.nan, dtype=float)
     mask = (b != 0)
@@ -187,7 +184,6 @@ def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
       - Division:       A I B  (e.g., srIsa.gc)  (safe; NaN if denom == 0)
     """
     # Pull base features in legacy naming
-    # (these columns will be created in run_folder below)
     sr_gc = df["sr.gc"].to_numpy(float)
     sa_gc = df["sa.gc"].to_numpy(float)
     pk_gc = df["peak.dist.gc"].to_numpy(float)
@@ -253,7 +249,6 @@ def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 ## ---------- Batch runner ----------
-
 def run_folder(
     folder: str | Path,
     num_windows: int = 4096,
@@ -340,7 +335,7 @@ def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title:str, out
     N = gc_skew.size
     theta = np.linspace(0, 2*np.pi, N, endpoint=False)
 
-    # Fixed spike length in data units
+    # Manually set up the max spike length for aesthetic purpose
     max_len = 0.10
 
     # Robust per-series normalization
@@ -357,8 +352,7 @@ def plot_circular_skews(gc_skew: np.ndarray, at_skew: np.ndarray, title:str, out
     r_pad = 0.05
     r_max = max(gc_base_radius, at_base_radius) + max_len + r_pad
     r_min = 0.0 
-    # ----------------------------------------------------------------------
-
+    
     fig = plt.figure(figsize=(6,6))
     ax = plt.subplot(111, polar=True)
 
@@ -429,7 +423,6 @@ def _ensure_columns(df: pd.DataFrame, needed_cols):
     missing = [c for c in needed_cols if c not in df.columns]
     if missing:
         _err(f"Input is missing {len(missing)} required columns (first 10 shown): {missing[:10]}")
-    # return in training order
     return df[needed_cols].copy()
 
 def _apply_standard_scaler(block: dict, X: np.ndarray) -> np.ndarray:
@@ -440,9 +433,8 @@ def _apply_standard_scaler(block: dict, X: np.ndarray) -> np.ndarray:
     return (X - mean_) / scale_
 
 def _apply_pca(block: dict, X_std: np.ndarray) -> np.ndarray:
-    comps = np.asarray(block["components_"], dtype=float)  # (k, d)
-    mean = np.asarray(block["mean_"], dtype=float)         # (d,)
-    # sklearn PCA transform: (X - mean) @ components_.T
+    comps = np.asarray(block["components_"], dtype=float) 
+    mean = np.asarray(block["mean_"], dtype=float)
     return (X_std - mean) @ comps.T
 
 def _sigmoid(z):
@@ -466,7 +458,7 @@ def _predict_with_knnpc(model_json: dict, feats_df: pd.DataFrame, id_col: str) -
 
     X = X_df.to_numpy(dtype=float)
     X_std = _apply_standard_scaler(model_json["scaler"], X)
-    X_pc = _apply_pca(model_json["pca"], X_std)  # (m, 3)
+    X_pc = _apply_pca(model_json["pca"], X_std)
 
     train_pc = np.asarray(model_json["training_embedding"]["X_pc"], dtype=float)
     train_y = np.asarray(model_json["training_embedding"]["y"], dtype=int)
@@ -479,9 +471,9 @@ def _predict_with_knnpc(model_json: dict, feats_df: pd.DataFrame, id_col: str) -
     preds = []
     for x in X_pc:
         if metric == "minkowski" and (p is None or int(p) == 2):
-            d = np.sqrt(((train_pc - x) ** 2).sum(axis=1))     # Euclidean
+            d = np.sqrt(((train_pc - x) ** 2).sum(axis=1))
         elif metric == "minkowski" and int(p) == 1:
-            d = np.abs(train_pc - x).sum(axis=1)               # Manhattan
+            d = np.abs(train_pc - x).sum(axis=1)
         else:
             _err(f"kNN metric '{metric}' with p={p} is not supported in this loader.")
 
@@ -535,7 +527,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
 
     # Standardize + PCA using saved params
     X_std = _apply_standard_scaler(mdl_json["scaler"], X)
-    X_pc_new = _apply_pca(mdl_json["pca"], X_std)  # (m, 3)
+    X_pc_new = _apply_pca(mdl_json["pca"], X_std)
 
     # Reference embedding + labels (multiclass for coloring)
     train_pc = np.asarray(mdl_json["training_embedding"]["X_pc"], dtype=float)
@@ -545,10 +537,10 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
              "Regenerate kNNPC.json to include both y (binary) and y_multi (1/2/3).")
     y_multi = np.asarray(y_multi, dtype=int)
 
-    # Colors for reference groups (same palette you used)
+    # Colors for reference groups
     color_map = {1: "orange", 2: "limegreen", 3: "skyblue"}
 
-    # Build Plotly traces: one per reference group + one for new samples
+    # Build Plotly traces
     traces = []
     for g in (1, 2, 3):
         mask = (y_multi == g)
@@ -567,17 +559,16 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
                 )
             )
 
-    # New samples trace
     new_ids = feats_df[id_col].astype(str).values
     traces.append(
         go.Scatter3d(
             x=X_pc_new[:, 0],
             y=X_pc_new[:, 1],
             z=X_pc_new[:, 2],
-            mode="markers+text" if annotate_new else "markers",  # labels on plot only if annotate_new
+            mode="markers+text" if annotate_new else "markers",
             name="New samples",
             marker=dict(size=point_size_new, color="gray", opacity=0.95),
-            text=new_ids,  # <-- always set for hover
+            text=new_ids,
             textposition="top center" if annotate_new else None,
             hovertemplate=(
                 "New sample<br>"
@@ -606,7 +597,7 @@ def plot_pca3_knnpc_ref3_plotly(input_csv: str,
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_html = Path(out_dir) / f"{base_name}.html"
-    # Write a standalone HTML you can open in any browser (no internet required)
+                                    
     pio.write_html(fig, file=str(out_html), full_html=True, include_plotlyjs="cdn")
     print(f"[OK] Saved interactive 3D PCA plot → {out_html}")
 
@@ -698,12 +689,11 @@ def plot_within_group_distance_hist(input_csv: str,
                  color="skyblue", edgecolor="black", label="Between-group",
                  orientation="vertical", weights=-np.ones_like(between_all))
 
-    # --- Draw NN distances for new samples
+    # --- Draw PED for new samples
     for d0 in nn_dists_new:
         if np.isfinite(d0):
             plt.axvline(d0, color="black", linestyle="--", alpha=0.9, linewidth=1)
 
-    # Styling
     plt.axhline(0, color="black", linewidth=0.8)
     plt.xlabel("Euclidean distance in 3D PC space (PC1–PC3)")
     plt.ylabel("Count (top=within, bottom=between)")
@@ -765,7 +755,6 @@ def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) 
     within_all = np.concatenate(within_all) if within_all else np.array([], dtype=float)
 
     # --- Build between-group distribution
-    # collect indices per group then all cross-group pairs
     idx1 = np.where(y_multi == 1)[0]
     idx2 = np.where(y_multi == 2)[0]
     idx3 = np.where(y_multi == 3)[0]
@@ -773,8 +762,6 @@ def _ped_confidences_knnpc(mdl_json: dict, feats_df: pd.DataFrame, id_col: str) 
     def _cross_pairs(A, B):
         if A.size == 0 or B.size == 0: return
         XA, XB = train_pc[A], train_pc[B]
-        # all pair distances between XA and XB
-        # (|A|,|B|,3) → (|A|,|B|)
         d = np.sqrt(np.sum((XA[:, None, :] - XB[None, :, :])**2, axis=2)).ravel()
         between_chunks.append(d)
     _cross_pairs(idx1, idx2)
@@ -816,9 +803,9 @@ def _predict_with_lg(model_json: dict, feats_df: pd.DataFrame, id_col: str) -> p
     X = X_df.to_numpy(dtype=float)
     X_std = _apply_standard_scaler(model_json["scaler"], X)
 
-    coef = np.asarray(model_json["logreg"]["coef_"], dtype=float)        # (1, d)
-    inter = np.asarray(model_json["logreg"]["intercept_"], dtype=float)  # (1,)
-    z = X_std @ coef.T + inter                                           # (m,1)
+    coef = np.asarray(model_json["logreg"]["coef_"], dtype=float)
+    inter = np.asarray(model_json["logreg"]["intercept_"], dtype=float)
+    z = X_std @ coef.T + inter
     p1 = _sigmoid(z).reshape(-1)
     yhat = (p1 >= 0.5).astype(int)
     return pd.DataFrame({id_col: ids, "polyploidy_pred": yhat, "predicted.probability": p1})
@@ -889,7 +876,6 @@ def run_prediction(
         out = _predict_with_lg(mdl_json, feats, id_col)
 
     elif model == "xgb":
-        # Need the exact training feature order; read from a sibling JSON that has 'feature_cols'
         feature_cols = None
         for companion in ["MLG.json", "kNNPC.json"]:
             cand = mdl_path.parent / companion
@@ -911,7 +897,7 @@ def run_prediction(
     if "PED.confidence" in out.columns:
         cols.append("PED.confidence")
     if "predicted.probability" in out.columns:
-        cols.append("predicted.probability")       # LG/XGB
+        cols.append("predicted.probability")
     out = out[cols]
     output_csv = OUTPUTS_DIR / Path(output_csv).name
     out.to_csv(output_csv, index=False)
@@ -991,8 +977,6 @@ def _load_checkm2_results_multi(result_dirs: list[Path]) -> pd.DataFrame:
     for d in result_dirs:
         tsv = d / "quality_report.tsv"
         if not tsv.exists():
-            # Some CheckM2 builds use a different file name; add fallbacks if needed
-            # e.g., "quality_report.txt"
             alt = d / "quality_report.txt"
             if alt.exists():
                 tsv = alt
@@ -1215,7 +1199,6 @@ def main():
 
         if knnpc_path.exists():
             try:
-                # NEW: interactive Plotly 3D PCA (HTML)
                 plot_pca3_knnpc_ref3_plotly(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
@@ -1227,7 +1210,7 @@ def main():
                     annotate_new=False
                 )
 
-                # Keep your distance histogram (matplotlib PNG)
+                # Keep distance histogram (matplotlib PNG)
                 plot_within_group_distance_hist(
                     input_csv=feats_csv,
                     model_path=knnpc_path,
