@@ -10,6 +10,10 @@ authors:
     orcid: 0000-0002-7912-1934
     equal-contrib: false
     affiliation: "1"
+  - name: Xin Wang
+    orcid: 0000-0002-7174-3042
+    corresponding: true
+    affiliation: "1"
   - name: Raquel Dias
     orcid: 0000-0002-8387-1324
     corresponding: true
