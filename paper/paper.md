@@ -71,9 +71,9 @@ The main prediction and prediction confidence are saved in the main output file 
 Table 2: Example of the main prediction output file in csv format
 | file | polyploidy_pred | PED.confidence | completeness | contamination |
 | :-------: | :------: | :-------: | :-------: |  :-------: |  
-| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 100.0| 0.08 |
-| Synechocystis_sp_PCC_6803.fasta | 1 | 1.0 | 100.0 | 0.01 |
-| Escherichia_coli.fna | 0 | 1.0 | 99.99 | 0.1 |
+| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 1.0| 0.0008 |
+| Synechocystis_sp_PCC_6803.fasta | 1 | 1.0 | 1.0 | 0.0001 |
+| Escherichia_coli.fna | 0 | 1.0 | 0.9999 | 0.001 |
 
 # Acknowledgement
 We are grateful to members from Dr. Raquel Dias lab for providing constructive feedbacks that helped refine and improve this package.
