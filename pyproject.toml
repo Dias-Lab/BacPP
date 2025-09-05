@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bpp"
-version = "0.1.0"
+version = "0.1.2"
 description = "Bacterial polyploidy predictor: GC/AT skew features + kNN/LogReg/XGBoost with optional CheckM2 QC"
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
