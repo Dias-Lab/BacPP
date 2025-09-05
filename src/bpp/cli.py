@@ -998,6 +998,9 @@ def _load_checkm2_results_multi(result_dirs: list[Path]) -> pd.DataFrame:
         sub = df[[name_col, comp_col, cont_col]].copy()
         sub.columns = ["name", "completeness", "contamination"]
 
+        for col in ["completeness", "contamination"]:
+            sub[col] = pd.to_numeric(sub[col], errors="coerce") / 100.0
+        
         records = []
         for _, r in sub.iterrows():
             name = str(r["name"])
