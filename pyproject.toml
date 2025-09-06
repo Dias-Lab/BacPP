@@ -1,15 +1,15 @@
 [tool.poetry]
-name = "bpp"
+name = "bacpp"
 version = "0.1.2"
 description = "Bacterial polyploidy predictor: GC/AT skew features + kNN/LogReg/XGBoost with optional CheckM2 QC"
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
 readme = "README.md"
-packages = [{ include = "bpp", from = "src" }]
+packages = [{ include = "bacpp", from = "src" }]
 
 include = [
-  "src/bpp/models/*.json",  # Always package models
-  "bpp.yml",                # Conda environment file
+  "src/bacpp/models/*.json",  # Always package models
+  "bacpp.yml",                # Conda environment file
   "example/*",              # Include example data
   "paper/*"                 # Include manuscript figures/data
 ]
@@ -24,7 +24,7 @@ xgboost = "^2.0"
 scikit-learn = "^1.5"
 
 [tool.poetry.scripts]
-bpp = "bpp.cli:main"
+bacpp = "bacpp.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.8"]
