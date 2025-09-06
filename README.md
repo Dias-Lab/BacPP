@@ -1,6 +1,6 @@
-# BPP: BacterialPloidyPredictor
+# BacPP: BacterialPloidyPredictor
 
-BacterialPloidyPredictor is the first package that aims to predict the bacterial polyploidy utilizing the complete genome assemblies. It allows users to apply one of the three machine learning models we trained for binary prediction. 
+BacterialPloidyPredictor (BacPP) is the first package that aims to predict the bacterial polyploidy utilizing the complete genome assemblies. It allows users to apply one of the three machine learning models we trained for binary prediction. 
 
 ## Installation
 
@@ -22,16 +22,16 @@ Ensure you have following packages:
 
 ```bash
 git clone https://github.com/Dias-Lab/BacterialPloidyPredictor-v1.git
-conda env create -n bpp -f bpp.yml
-conda activate bpp
-./bpp -h
+conda env create -n bacpp -f bacpp.yml
+conda activate bacpp
+./bacpp -h
 ```
 
 ### Option 2: through pip install
 
 ```bash
-pip install bpp
-bpp -h
+pip install bacpp
+bacpp -h
 ```
 
 ---
@@ -50,19 +50,19 @@ bpp -h
 
 ## Usage
 
-If installed via `pip`, use `bpp ...`; if installed via `git clone`, use `bpp.py ...`
+If installed via `pip`, use `bacpp ...`; if installed via `git clone`, use `bacpp.py ...`
 
 To pull out the instruction page for full list of arguments, 
 ```bash
-bpp -h
+bacpp -h
 ```
 
 ```bash
-usage: bpp [-h] [--predict] [--out OUT] [--cpus CPUS] [--images] [--checkm2] [--model {knn,lg,xgb}] [--model-path MODEL_PATH] [--num-windows NUM_WINDOWS]
+usage: bacpp [-h] [--predict] [--out OUT] [--cpus CPUS] [--images] [--checkm2] [--model {knn,lg,xgb}] [--model-path MODEL_PATH] [--num-windows NUM_WINDOWS]
            [--no-interactions] [--id-col ID_COL] [--pred-input PRED_INPUT] [--pred-output PRED_OUTPUT]
            folder
 
-BPP: Bactererial Ploidy Predictor to identify bacteiral polyploidy based on global genomic architecture.
+BacPP: Bactererial Ploidy Predictor to identify bacteiral polyploidy based on global genomic architecture.
 
 positional arguments:
   folder                Input folder containing FASTA/FA/FNA files
@@ -92,30 +92,30 @@ options:
 To serve as the test run of this tool, the following command can be copied directly and executed at package root directory to perform polyploidy prediction, visualizing global genomic architectures and prediction confidence-related statistics (PCA as an overview and quantile of pairwise Euclidean distance among in-group and between-group pairwise Euclidean distance distribution), as well as prediction result of CheckM2:
 
 ```bash
-bpp ./example --images --predict --cpus 4 --checkm2
+bacpp ./example --images --predict --cpus 4 --checkm2
 ```
 or:
 ```bash
-./bpp.py ./example --images --predict --cpus 4 --checkm2
+./bacpp.py ./example --images --predict --cpus 4 --checkm2
 ```
 If CheckM2 is not installed, please run:
 ```bash
-bpp ./example --images --predict --cpus 4
+bacpp ./example --images --predict --cpus 4
 ```
 or:
 ```bash
-./bpp.py ./example --images --predict --cpus 4
+./bacpp.py ./example --images --predict --cpus 4
 ```
 
 ## Note
 
-If no output directory is given, bpp will automatically generate a new subdirectory under the input directory named `outputs`, where `prediction.csv` as the main prediction result as well as the extracted feasures `extracted_features.csv` are included. One or two subdirectories `checkm2-result` (optional) and `images` will be generated to store raw output of CheckM2, and the exported `png` and interactive 3-dimensional PCA plot in `html` format.
+If no output directory is given, bacpp will automatically generate a new subdirectory under the input directory named `outputs`, where `prediction.csv` as the main prediction result as well as the extracted feasures `extracted_features.csv` are included. One or two subdirectories `checkm2-result` (optional) and `images` will be generated to store raw output of CheckM2, and the exported `png` and interactive 3-dimensional PCA plot in `html` format.
 
-CheckM2 only accept one fasta suffix among `fasta`, `fa`, and `fna`. However, you don't have to worry about renaming the input fasta files. All fasta files with either `fasta`, `fa`, or `fna` suffix can be dumped into one single input directory. BPP will read all fasta files and make prediction and plot using all recognized fasta files.
+CheckM2 only accept one fasta suffix among `fasta`, `fa`, and `fna`. However, you don't have to worry about renaming the input fasta files. All fasta files with either `fasta`, `fa`, or `fna` suffix can be dumped into one single input directory. BacPP will read all fasta files and make prediction and plot using all recognized fasta files.
 
 By default, the whole chromosome is split into 4096 windows for calculattion of oligonucleotide skew values. The models are all trained based on this setting. We did not observe significant predictive power change through fine-tuning number of windows. There are three models available for polyploidy prediction: `logistic regression`, `XGBoost`, and `kNN`. By default, `kNN` was deployed due to the best performance and no signs of overfitting.
 
-As mentioned above, installation of CheckM2 is recommended nevertheless BPP is fully functional without CheckM2. We simulatd partial genome assemblies ranging from 10% to 98% to assess the predictive power of BPP (See below) and see the Euclidean distance change compared to the coordinate generated uding complete genome assemblies on 3D PCA space. According to our result, genome assemblies/scaffold below 88% completeness would result in significant shift in feature values extracted for subsequent prediction, which could cause a false prediction using BPP. Usually the verified complete genome assemblies are recommended for most accurate prediction. 
+As mentioned above, installation of CheckM2 is recommended nevertheless BacPP is fully functional without CheckM2. We simulatd partial genome assemblies ranging from 10% to 98% to assess the predictive power of BacPP (See below) and see the Euclidean distance change compared to the coordinate generated uding complete genome assemblies on 3D PCA space. According to our result, genome assemblies/scaffold below 88% completeness would result in significant shift in feature values extracted for subsequent prediction, which could cause a false prediction using BacPP. Usually the verified complete genome assemblies are recommended for most accurate prediction. 
 
 <img src="paper/figures/simulated-genome-shift.png">
 
