@@ -7,5 +7,5 @@ dist/
 build/
 *.egg-info/
 
-# Generated outputs
-example/outputs/
+#example output files
+src/bacpp/examples/outputs/
