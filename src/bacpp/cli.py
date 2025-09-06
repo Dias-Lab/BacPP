@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.lines import Line2D
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
+from importlib import resources as pkg_resources
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ import plotly.io as pio
 import os
 import subprocess
 import shlex
+import shutil
 
 # Fixed constants for calculating spectrum amplitute (SA) - Arakawa et al., 2009
 K3 = 600.0
@@ -1049,6 +1051,16 @@ def _merge_checkm2_into_predictions(pred_csv: Path, checkm2_dir: Path):
     merged.to_csv(pred_csv, index=False)
     print(f"[checkm2] Appended completeness & contamination → {pred_csv}")
 
+def copy_examples_to(dest: str | Path) -> Path:
+    """Copy packaged examples to a destination directory and return the path."""
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    # Use importlib.resources for robust access whether installed as wheel/sdist
+    with pkg_resources.as_file((pkg_resources.files("bacpp") / "examples")) as src_dir:
+        shutil.copytree(src_dir, dest, dirs_exist_ok=True)
+    print(f"[examples] Copied packaged examples → {dest}")
+    return dest
+
 # ---------- CLI ----------
 OUTPUTS_DIR = None
 IMAGES_DIR = None
@@ -1065,6 +1077,7 @@ def main():
     p.add_argument("--cpus", type=int, default=min(4, os.cpu_count() or 1), help="Number of CPU cores (1=serial).")
     p.add_argument("--images", action="store_true", help="Generate GC/AT skew images into <output folder>/image")
     p.add_argument("--checkm2", action="store_true", help="Run CheckM2 and append completeness/contamination to predictions.csv.")
+    p.add_argument("--copy-examples", metavar="DIR", help="Copy packaged examples into DIR and exit.")
     p.add_argument("--model", default="knn", choices=["knn", "lg", "xgb"], help="Model to use for prediction if --predict is set. Default: knn")
     p.add_argument("--model-path", default=None, help="Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).")
     p.add_argument("--num-windows", type=int, default=4096, help="Number of windows for extracting global genomic architecture (default: 4096)")
@@ -1079,6 +1092,10 @@ def main():
 
     # --- Normalize paths (accept with/without trailing slash) ---
     args.folder = str(Path(args.folder).resolve())
+
+    if args.copy_examples:
+    	copy_examples_to(args.copy_examples)
+    	return
 
     # --- If user didn't provide --out, set it to <folder>/outputs ---
     if args.out is None:

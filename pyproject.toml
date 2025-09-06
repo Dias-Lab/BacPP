@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bacpp"
-version = "0.1.3"
+version = "0.1.4"
 description = "Bacterial polyploidy predictor: A Machine Learning Tool for Bacterial Polyploidy Prediction from Genome Assemblies"
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
@@ -8,10 +8,14 @@ readme = "README.md"
 packages = [{ include = "bacpp", from = "src" }]
 
 include = [
-  "src/bacpp/models/*.json",  # Always package models
-  "bacpp.yml",                # Conda environment file
-  "example/*",              # Include example data
-  "paper/*"                 # Include manuscript figures/data
+  { path = "src/bacpp/models/*.json", format = "wheel" },
+  { path = "src/bacpp/models/*.json", format = "sdist" },
+  { path = "src/bacpp/examples/*.fasta", format = "wheel" },
+  { path = "src/bacpp/examples/*.fasta", format = "sdist" },
+  { path = "src/bacpp/examples/*.fa", format = "wheel" },
+  { path = "src/bacpp/examples/*.fa", format = "sdist" },
+  { path = "src/bacpp/examples/*.fna", format = "wheel" },
+  { path = "src/bacpp/examples/*.fna", format = "sdist" }
 ]
 
 [tool.poetry.dependencies]
