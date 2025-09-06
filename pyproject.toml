@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "bacpp"
 version = "0.1.2"
-description = "Bacterial polyploidy predictor: GC/AT skew features + kNN/LogReg/XGBoost with optional CheckM2 QC"
+description = "Bacterial polyploidy predictor: A Machine Learning Tool for Bacterial Polyploidy Prediction from Genome Assemblies"
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
 readme = "README.md"
