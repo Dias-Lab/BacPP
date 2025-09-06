@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bacpp"
-version = "0.1.2"
+version = "0.1.3"
 description = "Bacterial polyploidy predictor: A Machine Learning Tool for Bacterial Polyploidy Prediction from Genome Assemblies"
 authors = ["Zhenxiong Jiang <jiangz1@ufl.edu>"]
 license = "MIT"
