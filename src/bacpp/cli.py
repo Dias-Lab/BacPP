@@ -1071,7 +1071,7 @@ def main():
     p = argparse.ArgumentParser(
         description="BPP: Bactererial Ploidy Predictor to identify bacteiral polyploidy based on global genomic architecture."
     )
-    p.add_argument("folder", type=str, help="Input folder containing FASTA/FA/FNA files")
+    p.add_argument("folder", nargs="?", default=None, help="Input folder containing FASTA/FA/FNA files")
     p.add_argument("--predict", action="store_true", help="After feature extraction, run polyploidy prediction using a trained model.")
     p.add_argument("--out", type=str, default=None, help="Output directory (default: <folder>/outputs)")
     p.add_argument("--cpus", type=int, default=min(4, os.cpu_count() or 1), help="Number of CPU cores (1=serial).")
@@ -1090,12 +1090,16 @@ def main():
 
     args = p.parse_args()
 
+    # --- input folder not required when creating example files
+    if args.copy_examples:
+        copy_examples_to(args.copy_examples)
+        return
+    
+    if not args.folder:
+        p.error("the following arguments are required: folder (unless --copy-examples is used)")
+    
     # --- Normalize paths (accept with/without trailing slash) ---
     args.folder = str(Path(args.folder).resolve())
-
-    if args.copy_examples:
-    	copy_examples_to(args.copy_examples)
-    	return
 
     # --- If user didn't provide --out, set it to <folder>/outputs ---
     if args.out is None:
