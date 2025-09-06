@@ -4,7 +4,7 @@ BacterialPloidyPredictor (BacPP) is the first package that aims to predict the b
 
 ## Installation
 
-To maximize the use of this tool, installation of CheckM2 is recommended. Although this BPP is fully functional without CheckM2, the incorporation of CheckM2 gives another metrics for the prediction confidence. According to our result, genome assemblies below 88% completeness would result in significant shift in feature values extracted for subsequent prediction. To enable the incorporation of CheckM2, add --checkm2. (See below for details)
+To maximize the use of this tool, installation of CheckM2 is recommended. Although this BacPP is fully functional without CheckM2, the incorporation of CheckM2 gives another metrics for the prediction confidence. According to our result, genome assemblies below 88% completeness would result in significant shift in feature values extracted for subsequent prediction. To enable the incorporation of CheckM2, add --checkm2. (See below for details)
 
 ### Prerequisites
 
