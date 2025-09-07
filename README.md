@@ -74,6 +74,7 @@ options:
   --cpus CPUS           Number of CPU cores (1=serial).
   --images              Generate GC/AT skew images into <output folder>/image
   --checkm2             Run CheckM2 and append completeness/contamination to predictions.csv.
+  --copy-examples DIR   Copy packaged examples into DIR and exit.
   --model {knn,lg,xgb}  Model to use for prediction if --predict is set. Default: knn
   --model-path MODEL_PATH
                         Path to model file (defaults to ./models/kNNPC.json / ./models/MLG.json / ./models/XGBoost.json).
@@ -92,19 +93,22 @@ options:
 To serve as the test run of this tool, the following command can be copied directly and executed at package root directory to perform polyploidy prediction, visualizing global genomic architectures and prediction confidence-related statistics (PCA as an overview and quantile of pairwise Euclidean distance among in-group and between-group pairwise Euclidean distance distribution), as well as prediction result of CheckM2:
 
 ```bash
-bacpp ./example --images --predict --cpus 4 --checkm2
+#Copy example fasta files into the subdirectory ./examples
+bacpp --copy-examples ./examples
+bacpp ./examples --images --predict --cpus 4 --checkm2
 ```
 or:
 ```bash
-./bacpp.py ./example --images --predict --cpus 4 --checkm2
+./bacpp.py ./src/bacpp/examples --images --predict --cpus 4 --checkm2
 ```
 If CheckM2 is not installed, please run:
 ```bash
-bacpp ./example --images --predict --cpus 4
+bacpp --copy-examples ./examples
+bacpp ./examples --images --predict --cpus 4
 ```
 or:
 ```bash
-./bacpp.py ./example --images --predict --cpus 4
+./bacpp.py ./src/bacpp/examples --images --predict --cpus 4
 ```
 
 ## Note
