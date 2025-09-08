@@ -129,9 +129,9 @@ Above is the illustration from a selection of outputs from examples using genome
 
 | file | polyploidy_pred | PED.confidence | completeness | contamination |
 | :-------: | :------: | :-------: | :-------: |  :-------: |  
-| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 100.0| 0.08 |
-| Escherichia_coli.fna | 0.725 | 0 | 1 | 100.0 | 0.01 |
-| Synechocystis_sp_PCC_6803.fasta | 1 | 1 | 99.99 | 0.1 |
+| Citrobacter_freundii_ATCC_8090.fasta | 1 | 0.9767195925928703 | 1.0| 0.0008 |
+| Escherichia_coli.fna | 0.725 | 0 | 1 | 1.0 | 0.0001 |
+| Synechocystis_sp_PCC_6803.fasta | 1 | 1 | 0.9999 | 0.001 |
 
 The main prediction and prediction confidence are saved in the main output file prediction.csv. Above is the example output when kNN (default) is selected as the model for prediction.
 
